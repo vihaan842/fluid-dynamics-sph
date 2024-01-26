@@ -1,15 +1,14 @@
 public class Simulation {
     private static final int DIMENSIONS = 2;
-    private static final double SIZE = 10.0;
+    public static final double SIZE = 10.0;
     private static final double SMOOTHING_LENGTH_SCALE = 0.5;
     private static final int PARTICLES = 100;
-    private static final double PRESSURE_POWER = 1.0 + 1.0/2;
+    private static final double PRESSURE_POWER = 1.0 + (1.0 / 2.0);
     private static final double DENSITY_POWER = PRESSURE_POWER - 2;
     private static final double PRESSURE_CONSTANT = 0.5;
     private static final double[] ZERO = {0.0, 0.0};
-    private double[][] positions;
-    private double[][] velocities;
-
+    public double[][] positions;
+    public double[][] velocities;
     public Simulation() {
 	positions = new double[PARTICLES][DIMENSIONS];
 	for (int i = 0; i < PARTICLES; i++) {
