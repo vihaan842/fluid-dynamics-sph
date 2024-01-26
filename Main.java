@@ -38,11 +38,14 @@ class Display extends Canvas {
 		sim = s;
 	}
 	public void paint(Graphics g) {
+	        double sum = 0.0;
 		//TODO freeze display when re-painting
 		g.clearRect(boundLeft, boundTop, viewWidth, viewHeight);
 		for (double[] pos : sim.positions) {
+		        sum += sim.magnitude(pos);
 			g.drawOval((int) (pos[0] * scaling), (int) (pos[1] * scaling), 4, 4);
 		}
 		g.drawString("Fluid Simulator", boundLeft + 40, boundTop + 40);
+		g.drawString(Double.toString(sum / sim.PARTICLES), boundLeft + 40, boundTop + 80);
 	}
 }

@@ -2,10 +2,13 @@ public class Simulation {
     private static final int DIMENSIONS = 2;
     public static final double SIZE = 10.0;
     private static final double SMOOTHING_LENGTH_SCALE = 0.5;
-    private static final int PARTICLES = 100;
+    public static final int PARTICLES = 500;
     private static final double PRESSURE_POWER = 1.0 + (1.0 / 2.0);
     private static final double DENSITY_POWER = PRESSURE_POWER - 2;
-    private static final double PRESSURE_CONSTANT = 0.5;
+    private static final double PRESSURE_CONSTANT = 0.01;
+    private static final double WALL_CONSTANT = 0.5;
+    private static final double DAMPING_FACTOR = 0.2;
+    private static final double G = 0.001;
     private static final double[] ZERO = {0.0, 0.0};
     public double[][] positions;
     public double[][] velocities;
@@ -109,19 +112,29 @@ public class Simulation {
 	    double s = 0.0;
 	    for (int j = 0; j < PARTICLES; j++) {
 		if (i != j) {
-		    acceleration[i] = multiply(-PRESSURE_CONSTANT *
-					       (
-						Math.pow(densities[i], DENSITY_POWER) + 
-						Math.pow(densities[j], DENSITY_POWER)
-						),
-					       kernel_gradient(subtract(positions[i],
-									positions[j])));
+		    acceleration[i] =
+			add(acceleration[i],
+			    multiply(-PRESSURE_CONSTANT *
+				     (
+				      Math.pow(densities[i], DENSITY_POWER) + 
+				      Math.pow(densities[j], DENSITY_POWER)
+				      ),
+				     kernel_gradient(subtract(positions[i],
+							      positions[j]))));
+		    acceleration[i][1] += G;
 		}
 	    }
 	}
 	// now, we have to update the velocities
 	for (int i = 0; i < PARTICLES; i++) {
 	    velocities[i] = add(velocities[i], acceleration[i]);
+	    // only for 2d
+	    if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {
+		velocities[i][0] *= DAMPING_FACTOR-1.0;
+	    }
+	    if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
+		velocities[i][1] *= DAMPING_FACTOR-1.0;
+	    }
 	}
 	// now, we update the positions
 	for (int i = 0; i < PARTICLES; i++) {
