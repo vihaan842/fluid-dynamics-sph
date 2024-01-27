@@ -19,7 +19,7 @@ public class Main {
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		while (true) {
 			displ.paint(gr);
-			//br.readLine();
+			br.readLine();
 			sim.step();
 		}
 	}
@@ -27,11 +27,10 @@ public class Main {
 class Display extends Canvas {
 	protected int viewWidth;
 	protected int viewHeight;
-	protected int boundLeft;
-	protected int boundTop;
 	double scaling;
 	Simulation sim;
 	int radius;
+	double pressureCoeff = 20.0;
 	Display(int x, int y, Simulation s) {
 		viewWidth = x;
 		viewHeight = y;
@@ -41,11 +40,50 @@ class Display extends Canvas {
 	}
 	public void paint(Graphics g) {
 		//TODO freeze display when re-painting
-		g.clearRect(boundLeft, boundTop, viewWidth, viewHeight);
-		g.drawString("Fluid Simulator", boundLeft + 40, boundTop + 40);
-		g.drawString("t=" + Double.toString(sim.time) + "s", boundLeft + 40, boundTop + 80);
+		//g.clearRect(0, 0, viewWidth, viewHeight);
+		//g.drawString("Fluid Simulator", 40, 40);
+		//g.drawString("t=" + Double.toString(sim.time) + "s", 40, 80);
+		double maxPressure = 0.0;
+		int rate = 10;
+		for (int j = 0; j < viewHeight; j += rate) {
+			for (int i = 0; i < viewWidth; i += rate) {
+				double pressure = Math.pow(pressure(((double) i) / scaling, ((double) j) / scaling), 0.2);
+				g.setColor(new Color((int) (pressure * pressureCoeff), (int) (pressure * pressureCoeff), (int) (pressure * pressureCoeff)));
+				g.fillRect(i, j, rate, rate);
+				if (pressure > maxPressure) {
+					maxPressure = pressure;
+				}
+			}
+		}
+		pressureCoeff = 200.0 / maxPressure;
+		/*
 		for (double[] pos : sim.positions) {
 			g.drawOval((int) (pos[0] * scaling), (int) (pos[1] * scaling), radius, radius);
 		}
+		*/
+	}
+	double pressure(double x, double y) {
+		double dim1min = x - Simulation.diameter;
+		double dim1max = x + Simulation.diameter;
+		double dim2min = y - Simulation.diameter;
+		double dim2max = y + Simulation.diameter;
+		double s = 0.0;
+		double[] r = new double[]{x, y};
+		for (int j = 0; j < sim.PARTICLES; j++) {
+		    if (sim.positions[j][0] <= dim1min) {
+			continue;
+		    }
+		    if (sim.positions[j][0] >= dim1max) {
+			continue;
+		    }
+		    if (sim.positions[j][1] <= dim2min) {
+			continue;
+		    }
+		    if (sim.positions[j][1] >= dim2max) {
+			continue;
+		    }
+		    s += sim.kernel(Simulation.subtract(r, sim.positions[j]));
+		}
+		return Simulation.PRESSURE_CONSTANT * Math.pow(s, Simulation.PRESSURE_POWER);
 	}
 }

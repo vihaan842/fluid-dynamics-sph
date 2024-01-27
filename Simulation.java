@@ -1,13 +1,13 @@
 public class Simulation {
     private static final int DIMENSIONS = 2;
     public static final double SIZE = 150.0;// meter
-    public static final double PARTICLE_RADIUS = 4.0;// meter
+    public static final double PARTICLE_RADIUS = 6.0;// meter
     public static final double diameter = PARTICLE_RADIUS * 2;// meter
     private static final double SMOOTHING_LENGTH_SCALE = PARTICLE_RADIUS / 2.0;
-    public static final int PARTICLES = 3000;
-    private static final double PRESSURE_POWER = 1.0 + (1.0 / 2.0);
-    private static final double DENSITY_POWER = PRESSURE_POWER - 2;
-    private static final double PRESSURE_CONSTANT = 10.0;
+    public static final int PARTICLES = 1000;
+    public static final double PRESSURE_POWER = 1.0 + (1.0 / 2.0);
+    public static final double DENSITY_POWER = PRESSURE_POWER - 1;// Should this be minus two?
+    public static final double PRESSURE_CONSTANT = 10.0;
     private static final double DAMPING_FACTOR = 0.9;
     private static final double NORMALIZATION_CONSTANT = 5.0 / (14.0 * Math.PI * SMOOTHING_LENGTH_SCALE * SMOOTHING_LENGTH_SCALE);// Assuming 2 dimensions
     private static final double G = 9.81;// meter/(second*second)
@@ -22,7 +22,7 @@ public class Simulation {
 	positions = new double[PARTICLES][DIMENSIONS];
 	for (int i = 0; i < PARTICLES; i++) {
 	    for (int j = 0; j < DIMENSIONS; j++) {
-		positions[i][j] = Math.random() * SIZE * 0.5 + 10.0;
+		positions[i][j] = (Math.random() * SIZE * 0.5 + 10.0) / ((double) (2 - j));
 	    }
 	}
 	velocities = new double[PARTICLES][DIMENSIONS];
@@ -33,22 +33,22 @@ public class Simulation {
     }
     
     // find the magnitude of a vector with 2 elements
-    public double magnitude(double[] vec) {
+    public static double magnitude(double[] vec) {
 	return Math.sqrt(vec[0]*vec[0] + vec[1]*vec[1]);
     }
 
     // subtract two vectors with 2 elements
-    public double[] subtract(double[] a, double[] b) {
+    public static double[] subtract(double[] a, double[] b) {
 	return new double[] {a[0]-b[0], a[1]-b[1]};
     }
 
     // add two vectors with 2 elements
-    public double[] add(double[] a, double[] b) {
+    public static double[] add(double[] a, double[] b) {
 	return new double[] {a[0]+b[0], a[1]+b[1]};
     }
 
     // scalar multiple of a vectors with 2 elements
-    public double[] scalar_multiple(double k, double[] vec) {
+    public static double[] scalar_multiple(double k, double[] vec) {
 	return new double[] {k * vec[0], k * vec[1]};
     }
     
