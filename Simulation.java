@@ -1,14 +1,16 @@
 public class Simulation {
     private static final int DIMENSIONS = 2;
-    public static final double SIZE = 40.0;
-    public static final double PARTICLE_RADIUS = 0.3;
+    public static final double SIZE = 100.0;
+    public static final double PARTICLE_RADIUS = 1.5;
+    public static final double diameter = PARTICLE_RADIUS * 2;
     private static final double SMOOTHING_LENGTH_SCALE = PARTICLE_RADIUS / 2.0;
-    public static final int PARTICLES = 1000;
+    public static final int PARTICLES = 2000;
     private static final double PRESSURE_POWER = 1.0 + (1.0 / 2.0);
     private static final double DENSITY_POWER = PRESSURE_POWER - 2;
-    private static final double PRESSURE_CONSTANT = 0.4;
-    private static final double DAMPING_FACTOR = 0.4;
-    private static final double G = 0.05;
+    private static final double PRESSURE_CONSTANT = 0.15;
+    private static final double DAMPING_FACTOR = 0.9;
+    private static final double NORMALIZATION_CONSTANT = 5.0 / (14.0 * Math.PI * SMOOTHING_LENGTH_SCALE * SMOOTHING_LENGTH_SCALE);// Assuming 2 dimensions
+    private static final double G = 0.08;
     private static final double[] ZERO = {0.0, 0.0};
     public double[][] positions;
     public double[][] velocities;
@@ -41,9 +43,9 @@ public class Simulation {
 	return new double[] {a[0]+b[0], a[1]+b[1]};
     }
 
-    // subtract two vectors with 2 elements
-    public double[] multiply(double c, double[] vec) {
-	return new double[] {c*vec[0], c*vec[1]};
+    // scalar multiple of a vectors with 2 elements
+    public double[] scalar_multiple(double k, double[] vec) {
+	return new double[] {k * vec[0], k * vec[1]};
     }
     
     public double kernel(double[] position) {
@@ -57,13 +59,13 @@ public class Simulation {
 	// If q is between 1 and 2, it is equal to (2-q)^3
 	else if (q >= 1) {
 	    double a = 2.0-q;
-	    return a*a*a;
+	    return a * a * a * NORMALIZATION_CONSTANT;
 	}
 	// Otherwise, it is equal to (2-q)^3 - 4(1-q)^3
 	else {
 	    double a = 2.0-q;
 	    double b = 1.0-q;
-	    return a*a*a-4*b*b*b;
+	    return (a * a * a - 4 * b * b * b) * NORMALIZATION_CONSTANT;
 	}
     }
 
@@ -83,10 +85,10 @@ public class Simulation {
 	}
 	else if (q >= 1) {
 	    // We distributed the 1/q, and then use the x,y,etc. in position
-	    return multiply(-4/q+6-3*q, position);
+	    return scalar_multiple((-4/q+6-3*q) * NORMALIZATION_CONSTANT, position);
 	}
 	else {
-	    return multiply(-16/q+28-15*q, position);
+	    return scalar_multiple((-16/q+28-15*q) * NORMALIZATION_CONSTANT, position);
 	}
     }
     
@@ -94,11 +96,27 @@ public class Simulation {
 	// Calculating the exact density is too difficult, so we use an approximation
 	// We estimate the density around a single particle as the sum of the masses
 	// times the smoothing kernel of the distance of all the particles.
-	// Since we assume that the mass is 0, we just sum the smoothing kernel values
+	// Since the mass is the same for all particles, we just sum the smoothing kernel values
 	double[] r = positions[index];
 	double s = 0.0;
-	for (int i = 0; i < PARTICLES; i++) {
-	    s += kernel(subtract(r, positions[i]));
+	double dim1min = r[0] - diameter;
+	double dim1max = r[0] + diameter;
+	double dim2min = r[1] - diameter;
+	double dim2max = r[1] + diameter;
+	for (int j = 0; j < PARTICLES; j++) {
+	    if (positions[j][0] <= dim1min) {
+		continue;
+	    }
+	    if (positions[j][0] >= dim1max) {
+		continue;
+	    }
+	    if (positions[j][1] <= dim2min) {
+		continue;
+	    }
+	    if (positions[j][1] >= dim2max) {
+		continue;
+	    }
+	    s += kernel(subtract(r, positions[j]));
 	}
 	return s;
     }
@@ -109,7 +127,6 @@ public class Simulation {
 	    densities[i] = density(i);
 	}
 	// we then use this to determine the acceleration for all the particles
-	double diameter = PARTICLE_RADIUS * 2;
 	for (int i = 0; i < PARTICLES; i++) {
 	    acceleration[i][0] = 0.0;
 	    acceleration[i][1] = 0.0;
@@ -135,7 +152,7 @@ public class Simulation {
 		    }
 		    acceleration[i] =
 			add(acceleration[i],
-			    multiply(-PRESSURE_CONSTANT *
+			    scalar_multiple(-PRESSURE_CONSTANT *
 				     (
 				      Math.pow(densities[i], DENSITY_POWER) + 
 				      Math.pow(densities[j], DENSITY_POWER)
