@@ -4,7 +4,7 @@ public class Simulation {
     public static final double PARTICLE_RADIUS = 6.0;// meter
     public static final double diameter = PARTICLE_RADIUS * 2;// meter
     private static final double SMOOTHING_LENGTH_SCALE = PARTICLE_RADIUS / 2.0;
-    public static final int PARTICLES = 1000;
+    public static final int PARTICLES = 1500;
     public static final double PRESSURE_POWER = 1.0 + (1.0 / 2.0);
     public static final double DENSITY_POWER = PRESSURE_POWER - 1;// Should this be minus two?
     public static final double PRESSURE_CONSTANT = 10.0;
@@ -18,11 +18,12 @@ public class Simulation {
     public double[] densities;
     public double timeStep;// seconds
     public double time;
+    private double mvct = 0.0;
     public Simulation(double step) {
 	positions = new double[PARTICLES][DIMENSIONS];
 	for (int i = 0; i < PARTICLES; i++) {
 	    for (int j = 0; j < DIMENSIONS; j++) {
-		positions[i][j] = (Math.random() * SIZE * 0.5 + 10.0) / ((double) (2 - j));
+		positions[i][j] = (Math.random() * SIZE * 0.5 + 30.0) / ((double) (2 - j));
 	    }
 	}
 	velocities = new double[PARTICLES][DIMENSIONS];
@@ -126,6 +127,17 @@ public class Simulation {
     }
 
     public void step() {
+	/*
+	mvct += 1.0 / (Math.random() * 10.0 * timeStep);
+	while (mvct >= 1.0) {
+		mvct--;
+		int i = (int) (Math.random() * PARTICLES);
+		positions[i][0] = 20.0 + (Math.random() * 10.0);
+		positions[i][1] = SIZE - 40 - (Math.random() * 100.0);
+		velocities[i][0] = Math.random();
+		velocities[i][1] = Math.random();
+	}
+	*/
 	// we first calculate the densities around each particle
 	for (int i = 0; i < PARTICLES; i++) {
 	    densities[i] = density(i);
@@ -179,7 +191,7 @@ public class Simulation {
 		velocities[i][1] *= DAMPING_FACTOR-1.0;
 	    }
 	    */
-	    if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {
+	    if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {// TODO Prevent particles from becoming stuck in walls when `timeStep' is small (less than 0.03) and when the damping factor is very high (greater than 0.95)
 		positions[i][0] -= DAMPING_FACTOR * 1.5 * velocities[i][0] * timeStep;
 		velocities[i][0] *= DAMPING_FACTOR - 1.0;
 	    }

@@ -8,18 +8,18 @@ import java.io.InputStreamReader;
 public class Main {
 	static int width = 1024;
 	public static void main(String[] args) throws Exception {
-		Simulation sim = new Simulation(0.1);
+		Simulation sim = new Simulation(1.0 / 15.0);
 		Display displ = new Display(width, width, sim);
 		JFrame frm = new JFrame();
 		frm.add(displ);
-		frm.setSize(width, width);
+		frm.setSize(width + 50, width + 50);
 		//f.setLayout(null);
 		frm.setVisible(true);
 		Graphics gr = displ.getGraphics();
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		while (true) {
 			displ.paint(gr);
-			br.readLine();
+			//br.readLine();
 			sim.step();
 		}
 	}
@@ -30,7 +30,7 @@ class Display extends Canvas {
 	double scaling;
 	Simulation sim;
 	int radius;
-	double pressureCoeff = 20.0;
+	double pressureCoeff = 150.0;
 	Display(int x, int y, Simulation s) {
 		viewWidth = x;
 		viewHeight = y;
@@ -41,21 +41,29 @@ class Display extends Canvas {
 	public void paint(Graphics g) {
 		//TODO freeze display when re-painting
 		//g.clearRect(0, 0, viewWidth, viewHeight);
-		//g.drawString("Fluid Simulator", 40, 40);
-		//g.drawString("t=" + Double.toString(sim.time) + "s", 40, 80);
 		double maxPressure = 0.0;
-		int rate = 10;
-		for (int j = 0; j < viewHeight; j += rate) {
-			for (int i = 0; i < viewWidth; i += rate) {
-				double pressure = Math.pow(pressure(((double) i) / scaling, ((double) j) / scaling), 0.2);
-				g.setColor(new Color((int) (pressure * pressureCoeff), (int) (pressure * pressureCoeff), (int) (pressure * pressureCoeff)));
-				g.fillRect(i, j, rate, rate);
-				if (pressure > maxPressure) {
-					maxPressure = pressure;
+		int pressureSamplingRate = 10;
+		
+		for (int j = 0; j < viewHeight; j += pressureSamplingRate) {
+			for (int i = 0; i < viewWidth; i += pressureSamplingRate) {
+				double pres;
+				int pressure = (int) ((pres = Math.pow(pressure(((double) i) / scaling, ((double) j) / scaling), 0.2)) * pressureCoeff);
+				if (pressure > 255) {
+					pressure = 255;
+				}
+				g.setColor(new Color((int) pressure, (int) pressure, (int) pressure));
+				g.fillRect(i, j, pressureSamplingRate, pressureSamplingRate);
+				if (pres > maxPressure) {
+					maxPressure = pres;
 				}
 			}
 		}
 		pressureCoeff = 200.0 / maxPressure;
+		g.setColor(new Color(255, 255, 255));
+		g.drawString("Fluid Simulator", 40, 940);
+		g.drawString("t=" + Double.toString(sim.time) + "s", 40, 980);
+		
+
 		/*
 		for (double[] pos : sim.positions) {
 			g.drawOval((int) (pos[0] * scaling), (int) (pos[1] * scaling), radius, radius);
