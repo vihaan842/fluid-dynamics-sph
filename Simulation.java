@@ -1,25 +1,29 @@
 public class Simulation {
     private static final int DIMENSIONS = 2;
-    public static final double SIZE = 10.0;
-    private static final double SMOOTHING_LENGTH_SCALE = 0.5;
-    public static final int PARTICLES = 500;
+    public static final double SIZE = 40.0;
+    public static final double PARTICLE_RADIUS = 0.3;
+    private static final double SMOOTHING_LENGTH_SCALE = PARTICLE_RADIUS / 2.0;
+    public static final int PARTICLES = 1000;
     private static final double PRESSURE_POWER = 1.0 + (1.0 / 2.0);
     private static final double DENSITY_POWER = PRESSURE_POWER - 2;
-    private static final double PRESSURE_CONSTANT = 0.01;
-    private static final double WALL_CONSTANT = 0.5;
-    private static final double DAMPING_FACTOR = 0.2;
-    private static final double G = 0.001;
+    private static final double PRESSURE_CONSTANT = 0.4;
+    private static final double DAMPING_FACTOR = 0.4;
+    private static final double G = 0.05;
     private static final double[] ZERO = {0.0, 0.0};
     public double[][] positions;
     public double[][] velocities;
+    public double[][] acceleration = new double[PARTICLES][DIMENSIONS];
+    public double[] densities = new double[PARTICLES];
     public Simulation() {
 	positions = new double[PARTICLES][DIMENSIONS];
 	for (int i = 0; i < PARTICLES; i++) {
 	    for (int j = 0; j < DIMENSIONS; j++) {
-		positions[i][j] = Math.random() * SIZE;
+		positions[i][j] = Math.random() * SIZE * 0.5 + 1.0;
 	    }
 	}
 	velocities = new double[PARTICLES][DIMENSIONS];
+	acceleration = new double[PARTICLES][DIMENSIONS];
+	densities = new double[PARTICLES];
     }
     
     // find the magnitude of a vector with 2 elements
@@ -101,17 +105,34 @@ public class Simulation {
 
     public void step() {
 	// we first calculate the densities around each particle
-	double[] densities = new double[PARTICLES];
 	for (int i = 0; i < PARTICLES; i++) {
 	    densities[i] = density(i);
 	}
 	// we then use this to determine the acceleration for all the particles
-	double[][] acceleration = new double[PARTICLES][DIMENSIONS];
+	double diameter = PARTICLE_RADIUS * 2;
 	for (int i = 0; i < PARTICLES; i++) {
+	    acceleration[i][0] = 0.0;
+	    acceleration[i][1] = 0.0;
 	    // <Insert explanation of derivation>
 	    double s = 0.0;
+	    double dim1min = positions[i][0] - diameter;
+	    double dim1max = positions[i][0] + diameter;
+	    double dim2min = positions[i][1] - diameter;
+	    double dim2max = positions[i][1] + diameter;
 	    for (int j = 0; j < PARTICLES; j++) {
 		if (i != j) {
+		    if (positions[j][0] <= dim1min) {
+			continue;
+		    }
+		    if (positions[j][0] >= dim1max) {
+			continue;
+		    }
+		    if (positions[j][1] <= dim2min) {
+			continue;
+		    }
+		    if (positions[j][1] >= dim2max) {
+			continue;
+		    }
 		    acceleration[i] =
 			add(acceleration[i],
 			    multiply(-PRESSURE_CONSTANT *
@@ -121,19 +142,29 @@ public class Simulation {
 				      ),
 				     kernel_gradient(subtract(positions[i],
 							      positions[j]))));
-		    acceleration[i][1] += G;
 		}
 	    }
+	    acceleration[i][1] += G;
 	}
 	// now, we have to update the velocities
 	for (int i = 0; i < PARTICLES; i++) {
 	    velocities[i] = add(velocities[i], acceleration[i]);
 	    // only for 2d
+	    /*
 	    if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {
 		velocities[i][0] *= DAMPING_FACTOR-1.0;
 	    }
 	    if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
 		velocities[i][1] *= DAMPING_FACTOR-1.0;
+	    }
+	    */
+	    if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {
+		positions[i][0] -= DAMPING_FACTOR * 3.0 * velocities[i][0];
+		velocities[i][0] *= DAMPING_FACTOR - 1.0;
+	    }
+	    if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
+		positions[i][1] -= DAMPING_FACTOR * 3.0 * velocities[i][1];
+		velocities[i][1] *= DAMPING_FACTOR - 1.0;
 	    }
 	}
 	// now, we update the positions

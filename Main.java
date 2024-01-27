@@ -19,7 +19,7 @@ public class Main {
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		while (true) {
 			displ.paint(gr);
-			br.readLine();
+			//br.readLine();
 			sim.step();
 		}
 	}
@@ -31,11 +31,13 @@ class Display extends Canvas {
 	protected int boundTop;
 	double scaling;
 	Simulation sim;
+	int radius;
 	Display(int x, int y, Simulation s) {
 		viewWidth = x;
 		viewHeight = y;
 		scaling = ((double) x) / Simulation.SIZE;
 		sim = s;
+		radius = (int) (Simulation.PARTICLE_RADIUS * scaling);
 	}
 	public void paint(Graphics g) {
 	        double sum = 0.0;
@@ -43,7 +45,7 @@ class Display extends Canvas {
 		g.clearRect(boundLeft, boundTop, viewWidth, viewHeight);
 		for (double[] pos : sim.positions) {
 		        sum += sim.magnitude(pos);
-			g.drawOval((int) (pos[0] * scaling), (int) (pos[1] * scaling), 4, 4);
+			g.drawOval((int) (pos[0] * scaling), (int) (pos[1] * scaling), radius, radius);
 		}
 		g.drawString("Fluid Simulator", boundLeft + 40, boundTop + 40);
 		g.drawString(Double.toString(sum / sim.PARTICLES), boundLeft + 40, boundTop + 80);
