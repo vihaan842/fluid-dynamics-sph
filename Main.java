@@ -8,7 +8,7 @@ import java.io.InputStreamReader;
 public class Main {
 	static int width = 1024;
 	public static void main(String[] args) throws Exception {
-		Simulation sim = new Simulation();
+		Simulation sim = new Simulation(0.1);
 		Display displ = new Display(width, width, sim);
 		JFrame frm = new JFrame();
 		frm.add(displ);
@@ -40,14 +40,12 @@ class Display extends Canvas {
 		radius = (int) (Simulation.PARTICLE_RADIUS * scaling);
 	}
 	public void paint(Graphics g) {
-	        double sum = 0.0;
 		//TODO freeze display when re-painting
 		g.clearRect(boundLeft, boundTop, viewWidth, viewHeight);
+		g.drawString("Fluid Simulator", boundLeft + 40, boundTop + 40);
+		g.drawString("t=" + Double.toString(sim.time) + "s", boundLeft + 40, boundTop + 80);
 		for (double[] pos : sim.positions) {
-		        sum += sim.magnitude(pos);
 			g.drawOval((int) (pos[0] * scaling), (int) (pos[1] * scaling), radius, radius);
 		}
-		g.drawString("Fluid Simulator", boundLeft + 40, boundTop + 40);
-		g.drawString(Double.toString(sum / sim.PARTICLES), boundLeft + 40, boundTop + 80);
 	}
 }
