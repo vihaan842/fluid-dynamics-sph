@@ -1,5 +1,6 @@
 import java.util.Set;
-import java.util.HashSet;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.stream.IntStream;
 
 public class Simulation {
     private static final int DIMENSIONS = 2;
@@ -30,7 +31,7 @@ public class Simulation {
 	chunks = new Set[chunk_size][chunk_size];
 	for (int i = 0; i < chunk_size; i++) {
 	    for (int j = 0; j < chunk_size; j++) {
-		chunks[i][j] = new HashSet();
+		chunks[i][j] = new CopyOnWriteArraySet();
 	    }
 	}
 	positions = new double[PARTICLES][DIMENSIONS];
@@ -178,75 +179,76 @@ public class Simulation {
 	*/
 	// we first update the positions using the old velocity and acceleration values,
 	// making sure to update the chunk values if necessary
-	for (int i = 0; i < PARTICLES; i++) {
-	    int oldChunkX = (int)(positions[i][0] / diameter);
-	    int oldChunkY = (int)(positions[i][1] / diameter);
-	    positions[i] = add(positions[i],
-			       add(scalar_multiple(timeStep, velocities[i]),
-				   scalar_multiple(timeStep*timeStep/2.0,
-						   accelerations[i])));
-	    if ((int)(positions[i][0] / diameter) != oldChunkX ||
-		(int)(positions[i][1] / diameter) != oldChunkY) {
-		chunks[oldChunkX][oldChunkY].remove(i);
-		chunks[(int)(positions[i][0] / diameter)][(int)(positions[i][1] / diameter)]
-		    .add(i);
-	    }
-	}
+	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
+		int oldChunkX = (int)(positions[i][0] / diameter);
+		int oldChunkY = (int)(positions[i][1] / diameter);
+		positions[i] = add(positions[i],
+				   add(scalar_multiple(timeStep, velocities[i]),
+				       scalar_multiple(timeStep*timeStep/2.0,
+						       accelerations[i])));
+		if ((int)(positions[i][0] / diameter) != oldChunkX ||
+		    (int)(positions[i][1] / diameter) != oldChunkY) {
+		    chunks[oldChunkX][oldChunkY].remove(i);
+		    chunks[(int)(positions[i][0] / diameter)][(int)(positions[i][1] / diameter)]
+			.add(i);
+		}
+	    });
 	// we then calculate the densities around each particle
-	for (int i = 0; i < PARTICLES; i++) {
-	    densities[i] = density(i);
-	}
+	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
+		densities[i] = density(i);
+	    });
 	// we then use this to determine the new accelerations for all the particles
-	for (int i = 0; i < PARTICLES; i++) {
-	    Set<Integer>[] cs = findChunks(positions[i]);
-	    new_accelerations[i][0] = 0.0;
-	    new_accelerations[i][1] = G;
-	    // <Insert explanation of derivation>
-	    double s = 0.0;
+	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
+		Set<Integer>[] cs = findChunks(positions[i]);
+		new_accelerations[i][0] = 0.0;
+		new_accelerations[i][1] = G;
+		// <Insert explanation of derivation>
+		double s = 0.0;
 
-	    for (Set<Integer> chunk: cs) {
-		if (chunk != null) {
-		    for (Integer j: chunk) {
-			if (i != j) {
-			    new_accelerations[i] =
-				add(new_accelerations[i],
-				    scalar_multiple(-PRESSURE_CONSTANT *
-						    (
-						     Math.pow(densities[i], DENSITY_POWER) + 
-						     Math.pow(densities[j], DENSITY_POWER)
-						     ),
-						    kernel_gradient(subtract(positions[i],
-									     positions[j]))));
+		for (Set<Integer> chunk: cs) {
+		    if (chunk != null) {
+			for (Integer j: chunk) {
+			    if (i != j) {
+				new_accelerations[i] =
+				    add(new_accelerations[i],
+					scalar_multiple(-PRESSURE_CONSTANT *
+							(
+							 Math.pow(densities[i], DENSITY_POWER) + 
+							 Math.pow(densities[j], DENSITY_POWER)
+							 ),
+							kernel_gradient(subtract(positions[i],
+										 positions[j]))));
+			    }
 			}
 		    }
 		}
-	    }
-	    new_accelerations[i] =
-		add(new_accelerations[i],
-		    scalar_multiple(DAMPING_FACTOR-1.0, velocities[i]));
-	}
+		new_accelerations[i] =
+		    add(new_accelerations[i],
+			scalar_multiple(DAMPING_FACTOR-1.0, velocities[i]));
+	    });
 	// now, we have to update the velocities
-	for (int i = 0; i < PARTICLES; i++) {
-	    velocities[i] = add(velocities[i],
-				scalar_multiple(timeStep/2,
-						add(accelerations[i],
-						    new_accelerations[i])));
-	    // only for 2d
-	    if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {
-		velocities[i][0] *= -1.0;
-	    }
-	    if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
-		velocities[i][1] *= -1.0;
-	    }
-	    // if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {// TODO Prevent particles from becoming stuck in walls when `timeStep' is small (less than 0.03) and when the damping factor is very high (greater than 0.95)
-	    // 	positions[i][0] -= DAMPING_FACTOR * 1.5 * velocities[i][0] * timeStep;
-	    // 	velocities[i][0] *= DAMPING_FACTOR - 1.0;
-	    // }
-	    // if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
-	    // 	positions[i][1] -= DAMPING_FACTOR * 1.5 * velocities[i][1] * timeStep;
-	    // 	velocities[i][1] *= DAMPING_FACTOR - 1.0;
-	    // }
-	}
+	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
+		velocities[i] = add(velocities[i],
+				    scalar_multiple(timeStep/2,
+						    add(accelerations[i],
+							new_accelerations[i])));
+		// only for 2d
+		if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {
+		    velocities[i][0] *= -1.0;
+		}
+		if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
+		    velocities[i][1] *= -1.0;
+		}
+		// if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {// TODO Prevent particles from becoming stuck in walls when `timeStep' is small (less than 0.03) and when the damping factor is very high (greater than 0.95)
+		// 	positions[i][0] -= DAMPING_FACTOR * 1.5 * velocities[i][0] * timeStep;
+		// 	velocities[i][0] *= DAMPING_FACTOR - 1.0;
+		// }
+		// if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
+		// 	positions[i][1] -= DAMPING_FACTOR * 1.5 * velocities[i][1] * timeStep;
+		// 	velocities[i][1] *= DAMPING_FACTOR - 1.0;
+		// }
+	    });
+	accelerations = new_accelerations;
 	time += timeStep;
     }
 }
