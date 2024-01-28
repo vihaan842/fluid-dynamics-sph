@@ -5,10 +5,11 @@ import java.lang.reflect.Method;
 import javax.swing.JFrame;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.Set;
 public class Main {
 	static int width = 1024;
 	public static void main(String[] args) throws Exception {
-		Simulation sim = new Simulation(1.0 / 15.0);
+		Simulation sim = new Simulation(1.0 / 30.0);
 		Display displ = new Display(width, width, sim);
 		JFrame frm = new JFrame();
 		frm.add(displ);
@@ -99,30 +100,19 @@ class Display extends Canvas {
 		*/
 	}
 	double[] pressure(double x, double y) {
-		double dim1min = x - Simulation.diameter;
-		double dim1max = x + Simulation.diameter;
-		double dim2min = y - Simulation.diameter;
-		double dim2max = y + Simulation.diameter;
 		double s = 0.0;
 		double dx = 0.00;
 		double dy = 0.00;
 		double[] r = new double[]{x, y};
-		for (int j = 0; j < sim.PARTICLES; j++) {
-		    if (sim.positions[j][0] <= dim1min) {
-			continue;
+		Set<Integer>[] cs = sim.findChunks(r);
+		for (Set<Integer> chunk: cs) {
+		    if (chunk != null) {
+			for (Integer particle: chunk) {
+			    s += sim.kernel(Simulation.subtract(r, sim.positions[particle]));
+			    dx += s * sim.velocities[particle][0];
+			    dy += s * sim.velocities[particle][1];
+			}
 		    }
-		    if (sim.positions[j][0] >= dim1max) {
-			continue;
-		    }
-		    if (sim.positions[j][1] <= dim2min) {
-			continue;
-		    }
-		    if (sim.positions[j][1] >= dim2max) {
-			continue;
-		    }
-		    s += sim.kernel(Simulation.subtract(r, sim.positions[j]));
-		    dx += s * sim.velocities[j][0];
-		    dy += s * sim.velocities[j][1];
 		}
 		if (dx != 0.0) {
 			dx /= s;

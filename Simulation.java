@@ -113,7 +113,7 @@ public class Simulation {
 	}
     }
 
-    private Set<Integer>[] findChunks(double[] r) {
+    public Set<Integer>[] findChunks(double[] r) {
 	int chunkX = (int)(r[0] / diameter);
 	int chunkY = (int)(r[1] / diameter);
 	Set<Integer>[] cs = new Set[9];
