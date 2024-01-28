@@ -14,7 +14,7 @@ public class Simulation {
     private static final double[] ZERO_VECTOR = {0.0, 0.0};
     public double[][] positions;// meter
     public double[][] velocities;// meter/second
-    public double[][] acceleration;// meter/(second*second)
+    public double[][] accelerations;// meter/(second*second)
     public double[] densities;
     public double timeStep;// seconds
     public double time;
@@ -27,7 +27,7 @@ public class Simulation {
 	    }
 	}
 	velocities = new double[PARTICLES][DIMENSIONS];
-	acceleration = new double[PARTICLES][DIMENSIONS];
+	accelerations = new double[PARTICLES][DIMENSIONS];
 	densities = new double[PARTICLES];
 	timeStep = step;
 	time = 0;
@@ -138,14 +138,22 @@ public class Simulation {
 		velocities[i][1] = Math.random();
 	}
 	*/
-	// we first calculate the densities around each particle
+	// we first update the positions using the old velocity and acceleration values
+	for (int i = 0; i < PARTICLES; i++) {
+	    positions[i] = add(positions[i],
+			       add(scalar_multiple(timeStep, velocities[i]),
+				   scalar_multiple(timeStep*timeStep/2.0,
+						   accelerations[i])));
+	}
+	// we then calculate the densities around each particle
 	for (int i = 0; i < PARTICLES; i++) {
 	    densities[i] = density(i);
 	}
-	// we then use this to determine the acceleration for all the particles
+	// we then use this to determine the new accelerations for all the particles
+	double[][] new_accelerations = new double[PARTICLES][DIMENSIONS];
 	for (int i = 0; i < PARTICLES; i++) {
-	    acceleration[i][0] = 0.0;
-	    acceleration[i][1] = 0.0;
+	    new_accelerations[i][0] = 0.0;
+	    new_accelerations[i][1] = G;
 	    // <Insert explanation of derivation>
 	    double s = 0.0;
 	    double dim1min = positions[i][0] - diameter;
@@ -166,25 +174,27 @@ public class Simulation {
 		    if (positions[j][1] >= dim2max) {
 			continue;
 		    }
-		    acceleration[i] =
-			add(acceleration[i],
+		    new_accelerations[i] =
+			add(new_accelerations[i],
 			    scalar_multiple(-PRESSURE_CONSTANT *
-				     (
-				      Math.pow(densities[i], DENSITY_POWER) + 
-				      Math.pow(densities[j], DENSITY_POWER)
-				      ),
-				     kernel_gradient(subtract(positions[i],
-							      positions[j]))));
+					    (
+					     Math.pow(densities[i], DENSITY_POWER) + 
+					     Math.pow(densities[j], DENSITY_POWER)
+					     ),
+					    kernel_gradient(subtract(positions[i],
+								     positions[j]))));
 		}
 	    }
-	    acceleration[i][1] += G;
-	    acceleration[i] =
-		add(acceleration[i],
+	    new_accelerations[i] =
+		add(new_accelerations[i],
 		    scalar_multiple(DAMPING_FACTOR-1.0, velocities[i]));
 	}
 	// now, we have to update the velocities
 	for (int i = 0; i < PARTICLES; i++) {
-	    velocities[i] = add(velocities[i], scalar_multiple(timeStep, acceleration[i]));
+	    velocities[i] = add(velocities[i],
+				scalar_multiple(timeStep/2,
+						add(accelerations[i],
+						    new_accelerations[i])));
 	    // only for 2d
 	    if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {
 		velocities[i][0] *= -1.0;
@@ -200,10 +210,6 @@ public class Simulation {
 	    // 	positions[i][1] -= DAMPING_FACTOR * 1.5 * velocities[i][1] * timeStep;
 	    // 	velocities[i][1] *= DAMPING_FACTOR - 1.0;
 	    // }
-	}
-	// now, we update the positions
-	for (int i = 0; i < PARTICLES; i++) {
-	    positions[i] = add(positions[i], scalar_multiple(timeStep, velocities[i]));
 	}
 	time += timeStep;
     }
