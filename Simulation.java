@@ -1,3 +1,6 @@
+import java.util.Set;
+import java.util.HashSet;
+
 public class Simulation {
     private static final int DIMENSIONS = 2;
     public static final double SIZE = 150.0;// meter
@@ -17,15 +20,26 @@ public class Simulation {
     public double[][] accelerations;// meter/(second*second)
     public double[][] new_accelerations;// meter/(second*second)
     public double[] densities;
+    private Set<Integer>[][] chunks;
+    private int chunk_size;
     public double timeStep;// seconds
     public double time;
     private double mvct = 0.0;
     public Simulation(double step) {
+	chunk_size = (int)Math.ceil(SIZE/diameter);
+	chunks = new Set[chunk_size][chunk_size];
+	for (int i = 0; i < chunk_size; i++) {
+	    for (int j = 0; j < chunk_size; j++) {
+		chunks[i][j] = new HashSet();
+	    }
+	}
 	positions = new double[PARTICLES][DIMENSIONS];
 	for (int i = 0; i < PARTICLES; i++) {
 	    for (int j = 0; j < DIMENSIONS; j++) {
 		positions[i][j] = (Math.random() * SIZE * 0.5 + 30.0) / ((double) (2 - j));
 	    }
+	    chunks[(int)(positions[i][0]/diameter)][(int)(positions[i][1]/diameter)]
+		.add(i);
 	}
 	velocities = new double[PARTICLES][DIMENSIONS];
 	accelerations = new double[PARTICLES][DIMENSIONS];
@@ -98,6 +112,38 @@ public class Simulation {
 	    return scalar_multiple((-16/q+28-15*q) * NORMALIZATION_CONSTANT, position);
 	}
     }
+
+    private Set<Integer>[] findChunks(double[] r) {
+	int chunkX = (int)(r[0] / diameter);
+	int chunkY = (int)(r[1] / diameter);
+	Set<Integer>[] cs = new Set[9];
+	cs[0] = chunks[chunkX][chunkY];
+	if (chunkX > 0) {
+	    if (chunkY > 0) {
+		cs[1] = chunks[chunkX-1][chunkY-1];
+	    }
+	    cs[2] = chunks[chunkX-1][chunkY];
+	    if (chunkY < chunk_size-1) {
+		cs[3] = chunks[chunkX-1][chunkY+1];
+	    }
+	}
+	if (chunkX < chunk_size-1) {
+	    if (chunkY > 0) {
+		cs[4] = chunks[chunkX+1][chunkY-1];
+	    }
+	    cs[5] = chunks[chunkX+1][chunkY];
+	    if (chunkY < chunk_size-1) {
+		cs[6] = chunks[chunkX+1][chunkY+1];
+	    }
+	}
+	if (chunkY > 0) {
+	    cs[7] = chunks[chunkX][chunkY-1];
+	}
+	if (chunkY < chunk_size-1) {
+	    cs[8] = chunks[chunkX][chunkY+1];
+	}
+	return cs;
+    }
     
     public double density(int index) {
 	// Calculating the exact density is too difficult, so we use an approximation
@@ -105,25 +151,15 @@ public class Simulation {
 	// times the smoothing kernel of the distance of all the particles.
 	// Since the mass is the same for all particles, we just sum the smoothing kernel values
 	double[] r = positions[index];
+	Set<Integer>[] cs = findChunks(r);
+
 	double s = 0.0;
-	double dim1min = r[0] - diameter;
-	double dim1max = r[0] + diameter;
-	double dim2min = r[1] - diameter;
-	double dim2max = r[1] + diameter;
-	for (int j = 0; j < PARTICLES; j++) {
-	    if (positions[j][0] <= dim1min) {
-		continue;
+	for (Set<Integer> chunk: cs) {
+	    if (chunk != null) {
+		for (Integer particle: chunk) {
+		    s += kernel(subtract(r, positions[particle]));
+		}
 	    }
-	    if (positions[j][0] >= dim1max) {
-		continue;
-	    }
-	    if (positions[j][1] <= dim2min) {
-		continue;
-	    }
-	    if (positions[j][1] >= dim2max) {
-		continue;
-	    }
-	    s += kernel(subtract(r, positions[j]));
 	}
 	return s;
     }
@@ -140,12 +176,21 @@ public class Simulation {
 		velocities[i][1] = Math.random();
 	}
 	*/
-	// we first update the positions using the old velocity and acceleration values
+	// we first update the positions using the old velocity and acceleration values,
+	// making sure to update the chunk values if necessary
 	for (int i = 0; i < PARTICLES; i++) {
+	    int oldChunkX = (int)(positions[i][0] / diameter);
+	    int oldChunkY = (int)(positions[i][1] / diameter);
 	    positions[i] = add(positions[i],
 			       add(scalar_multiple(timeStep, velocities[i]),
 				   scalar_multiple(timeStep*timeStep/2.0,
 						   accelerations[i])));
+	    if ((int)(positions[i][0] / diameter) != oldChunkX ||
+		(int)(positions[i][1] / diameter) != oldChunkY) {
+		chunks[oldChunkX][oldChunkY].remove(i);
+		chunks[(int)(positions[i][0] / diameter)][(int)(positions[i][1] / diameter)]
+		    .add(i);
+	    }
 	}
 	// we then calculate the densities around each particle
 	for (int i = 0; i < PARTICLES; i++) {
@@ -153,37 +198,27 @@ public class Simulation {
 	}
 	// we then use this to determine the new accelerations for all the particles
 	for (int i = 0; i < PARTICLES; i++) {
+	    Set<Integer>[] cs = findChunks(positions[i]);
 	    new_accelerations[i][0] = 0.0;
 	    new_accelerations[i][1] = G;
 	    // <Insert explanation of derivation>
 	    double s = 0.0;
-	    double dim1min = positions[i][0] - diameter;
-	    double dim1max = positions[i][0] + diameter;
-	    double dim2min = positions[i][1] - diameter;
-	    double dim2max = positions[i][1] + diameter;
-	    for (int j = 0; j < PARTICLES; j++) {
-		if (i != j) {
-		    if (positions[j][0] <= dim1min) {
-			continue;
+
+	    for (Set<Integer> chunk: cs) {
+		if (chunk != null) {
+		    for (Integer j: chunk) {
+			if (i != j) {
+			    new_accelerations[i] =
+				add(new_accelerations[i],
+				    scalar_multiple(-PRESSURE_CONSTANT *
+						    (
+						     Math.pow(densities[i], DENSITY_POWER) + 
+						     Math.pow(densities[j], DENSITY_POWER)
+						     ),
+						    kernel_gradient(subtract(positions[i],
+									     positions[j]))));
+			}
 		    }
-		    if (positions[j][0] >= dim1max) {
-			continue;
-		    }
-		    if (positions[j][1] <= dim2min) {
-			continue;
-		    }
-		    if (positions[j][1] >= dim2max) {
-			continue;
-		    }
-		    new_accelerations[i] =
-			add(new_accelerations[i],
-			    scalar_multiple(-PRESSURE_CONSTANT *
-					    (
-					     Math.pow(densities[i], DENSITY_POWER) + 
-					     Math.pow(densities[j], DENSITY_POWER)
-					     ),
-					    kernel_gradient(subtract(positions[i],
-								     positions[j]))));
 		}
 	    }
 	    new_accelerations[i] =
