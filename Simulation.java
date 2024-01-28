@@ -15,6 +15,7 @@ public class Simulation {
     public double[][] positions;// meter
     public double[][] velocities;// meter/second
     public double[][] accelerations;// meter/(second*second)
+    public double[][] new_accelerations;// meter/(second*second)
     public double[] densities;
     public double timeStep;// seconds
     public double time;
@@ -28,6 +29,7 @@ public class Simulation {
 	}
 	velocities = new double[PARTICLES][DIMENSIONS];
 	accelerations = new double[PARTICLES][DIMENSIONS];
+	new_accelerations = new double[PARTICLES][DIMENSIONS];
 	densities = new double[PARTICLES];
 	timeStep = step;
 	time = 0;
@@ -150,7 +152,6 @@ public class Simulation {
 	    densities[i] = density(i);
 	}
 	// we then use this to determine the new accelerations for all the particles
-	double[][] new_accelerations = new double[PARTICLES][DIMENSIONS];
 	for (int i = 0; i < PARTICLES; i++) {
 	    new_accelerations[i][0] = 0.0;
 	    new_accelerations[i][1] = G;
