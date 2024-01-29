@@ -7,9 +7,9 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Set;
 public class Main {
-	static int width = 1024;
+	static int width = 800;
 	public static void main(String[] args) throws Exception {
-		Simulation sim = new Simulation(1.0 / 30.0);
+		Simulation sim = new Simulation(1.0 / 15.0);
 		Display displ = new Display(width, width, sim);
 		JFrame frm = new JFrame();
 		frm.add(displ);
@@ -19,9 +19,10 @@ public class Main {
 		Graphics gr = displ.getGraphics();
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		while (true) {
-			displ.paint(gr);
-			//br.readLine();
+		    for (int i = 0; i < 5; i++) {
 			sim.step();
+		    }
+		    displ.paint(gr);
 		}
 	}
 }
@@ -89,8 +90,8 @@ class Display extends Canvas {
 		pressureCoeff = 200.0 / maxPressure;
 		mvmtCoeff = 200.0 / maxMvmt;
 		g.setColor(new Color(255, 255, 255));
-		g.drawString("Fluid Simulator", 40, 990);
-		g.drawString("t=" + Double.toString(sim.time) + "s", 40, 1010);
+		g.drawString("Fluid Simulator", 40, 750);
+		g.drawString("t=" + Double.toString(sim.time) + "s", 40, 770);
 		
 		/*
 		g.clearRect(0, 0, viewWidth, viewHeight);
