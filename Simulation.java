@@ -195,7 +195,7 @@ public class Simulation {
 	    });
 	// we then calculate the densities around each particle
 	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
-		densities[i] = density(i);
+		densities[i] = Math.pow(density(i), DENSITY_POWER);
 	    });
 	// we then use this to determine the new accelerations for all the particles
 	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
@@ -213,8 +213,8 @@ public class Simulation {
 				    add(new_accelerations[i],
 					scalar_multiple(-PRESSURE_CONSTANT *
 							(
-							 Math.pow(densities[i], DENSITY_POWER) + 
-							 Math.pow(densities[j], DENSITY_POWER)
+							 densities[i] + 
+							 densities[j]
 							 ),
 							kernel_gradient(subtract(positions[i],
 										 positions[j]))));
