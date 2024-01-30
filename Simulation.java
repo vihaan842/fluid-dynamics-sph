@@ -21,13 +21,14 @@ public class Simulation {
     public double[][] accelerations;// meter/(second*second)
     public double[][] new_accelerations;// meter/(second*second)
     public double[] densities;
+    public final double chunkSize = diameter / 2;
     private Set<Integer>[][] chunks;
     private int chunk_size;
     public double timeStep;// seconds
     public double time;
     private double mvct = 0.0;
     public Simulation(double step) {
-	chunk_size = (int)Math.ceil(SIZE/diameter);
+	chunk_size = (int)Math.ceil(SIZE/chunkSize);
 	chunks = new Set[chunk_size][chunk_size];
 	for (int i = 0; i < chunk_size; i++) {
 	    for (int j = 0; j < chunk_size; j++) {
@@ -39,7 +40,7 @@ public class Simulation {
 	    for (int j = 0; j < DIMENSIONS; j++) {
 		positions[i][j] = (Math.random() * SIZE * 0.5 + 30.0) / ((double) (2 - j));
 	    }
-	    chunks[(int)(positions[i][0]/diameter)][(int)(positions[i][1]/diameter)]
+	    chunks[(int)(positions[i][0]/chunkSize)][(int)(positions[i][1]/chunkSize)]
 		.add(i);
 	}
 	velocities = new double[PARTICLES][DIMENSIONS];
@@ -115,8 +116,8 @@ public class Simulation {
     }
 
     public Set<Integer>[] findChunks(double[] r) {
-	int chunkX = (int)(r[0] / diameter);
-	int chunkY = (int)(r[1] / diameter);
+	int chunkX = (int)(r[0] / chunkSize);
+	int chunkY = (int)(r[1] / chunkSize);
 	Set<Integer>[] cs = new Set[9];
 	cs[0] = chunks[chunkX][chunkY];
 	if (chunkX > 0) {
@@ -128,7 +129,7 @@ public class Simulation {
 		cs[3] = chunks[chunkX-1][chunkY+1];
 	    }
 	}
-	if (chunkX < chunk_size-1) {
+	if (chunkX < (chunk_size - 1)) {
 	    if (chunkY > 0) {
 		cs[4] = chunks[chunkX+1][chunkY-1];
 	    }
@@ -140,7 +141,7 @@ public class Simulation {
 	if (chunkY > 0) {
 	    cs[7] = chunks[chunkX][chunkY-1];
 	}
-	if (chunkY < chunk_size-1) {
+	if (chunkY < (chunk_size - 1)) {
 	    cs[8] = chunks[chunkX][chunkY+1];
 	}
 	return cs;
@@ -180,16 +181,36 @@ public class Simulation {
 	// we first update the positions using the old velocity and acceleration values,
 	// making sure to update the chunk values if necessary
 	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
-		int oldChunkX = (int)(positions[i][0] / diameter);
-		int oldChunkY = (int)(positions[i][1] / diameter);
+		int oldChunkX = (int)(positions[i][0] / chunkSize);
+		int oldChunkY = (int)(positions[i][1] / chunkSize);
 		positions[i] = add(positions[i],
 				   add(scalar_multiple(timeStep, velocities[i]),
 				       scalar_multiple(timeStep*timeStep/2.0,
 						       accelerations[i])));
-		if ((int)(positions[i][0] / diameter) != oldChunkX ||
-		    (int)(positions[i][1] / diameter) != oldChunkY) {
+		if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {// TODO Prevent particles from becoming stuck in walls when `timeStep' is small (less than 0.03) and when the damping factor is very high (greater than 0.95)
+			positions[i][0] -= DAMPING_FACTOR * 1.5 * velocities[i][0] * timeStep;
+			velocities[i][0] *= DAMPING_FACTOR - 1.0;
+		}
+		if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
+			positions[i][1] -= DAMPING_FACTOR * 1.5 * velocities[i][1] * timeStep;
+			velocities[i][1] *= DAMPING_FACTOR - 1.0;
+		}
+		if (positions[i][0] < 0) {
+			positions[i][0] = 0;
+		}
+		else if (positions[i][0] >= SIZE) {
+			positions[i][0] = SIZE - 0.001;
+		}
+		if (positions[i][1] < 0) {
+			positions[i][1] = 0;
+		}
+		else if (positions[i][1] >= SIZE) {
+			positions[i][1] = SIZE - 0.001;
+		}
+		if ((int)(positions[i][0] / chunkSize) != oldChunkX ||
+		    (int)(positions[i][1] / chunkSize) != oldChunkY) {
 		    chunks[oldChunkX][oldChunkY].remove(i);
-		    chunks[(int)(positions[i][0] / diameter)][(int)(positions[i][1] / diameter)]
+		    chunks[(int)(positions[i][0] / chunkSize)][(int)(positions[i][1] / chunkSize)]
 			.add(i);
 		}
 	    });
@@ -239,14 +260,6 @@ public class Simulation {
 		// if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
 		//     velocities[i][1] *= -1.0;
 		// }
-		if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {// TODO Prevent particles from becoming stuck in walls when `timeStep' is small (less than 0.03) and when the damping factor is very high (greater than 0.95)
-			positions[i][0] -= DAMPING_FACTOR * 1.5 * velocities[i][0] * timeStep;
-			velocities[i][0] *= DAMPING_FACTOR - 1.0;
-		}
-		if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
-			positions[i][1] -= DAMPING_FACTOR * 1.5 * velocities[i][1] * timeStep;
-			velocities[i][1] *= DAMPING_FACTOR - 1.0;
-		}
 	    });
 	accelerations = new_accelerations;
 	time += timeStep;
