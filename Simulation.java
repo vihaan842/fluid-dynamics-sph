@@ -14,6 +14,7 @@ public class Simulation {
     public static final double PRESSURE_CONSTANT = 10.0;
     private static final double DAMPING_FACTOR = 0.9;
     private static final double NORMALIZATION_CONSTANT = 5.0 / (14.0 * Math.PI * SMOOTHING_LENGTH_SCALE * SMOOTHING_LENGTH_SCALE);// Assuming 2 dimensions
+    private static final double XSPH_CONSTANT = 1.0; // note: this has no real world analog; this is just for simulation purposes
     private static final double G = 9.81;// meter/(second*second)
     private static final double[] ZERO_VECTOR = {0.0, 0.0};
     public double[][] positions;// meter
@@ -21,6 +22,7 @@ public class Simulation {
     public double[][] accelerations;// meter/(second*second)
     public double[][] new_accelerations;// meter/(second*second)
     public double[] densities;
+    private double[][] kernel_values;
     public final int chunkScale = 2;
     public final double chunkSize = diameter / (double)chunkScale;
     private Set<Integer>[][] chunks;
@@ -48,6 +50,7 @@ public class Simulation {
 	accelerations = new double[PARTICLES][DIMENSIONS];
 	new_accelerations = new double[PARTICLES][DIMENSIONS];
 	densities = new double[PARTICLES];
+	kernel_values = new double[PARTICLES][PARTICLES];
 	timeStep = step;
 	time = 0;
     }
@@ -145,7 +148,8 @@ public class Simulation {
 	for (Set<Integer> chunk: cs) {
 	    if (chunk != null) {
 		for (Integer particle: chunk) {
-		    s += kernel(subtract(r, positions[particle]));
+		    kernel_values[index][particle] = kernel(subtract(r, positions[particle]));
+		    s += kernel_values[index][particle];
 		}
 	    }
 	}
@@ -195,13 +199,13 @@ public class Simulation {
 	    });
 	// we then calculate the densities around each particle
 	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
-		densities[i] = Math.pow(density(i), DENSITY_POWER);
+		densities[i] = Math.max(0.001, Math.pow(density(i), DENSITY_POWER));
 	    });
 	// we then use this to determine the new accelerations for all the particles
 	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
 		Set<Integer>[] cs = findChunks(positions[i]);
 		new_accelerations[i][0] = 0.0;
-		new_accelerations[i][1] = 0.0;
+		new_accelerations[i][1] = G;
 		// <Insert explanation of derivation>
 		double s = 0.0;
 
@@ -232,13 +236,22 @@ public class Simulation {
 				    scalar_multiple(timeStep/2,
 						    add(accelerations[i],
 							new_accelerations[i])));
-		// only for 2d
-		// if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {
-		//     velocities[i][0] *= -1.0;
-		// }
-		// if (positions[i][1] < 0.0 || positions[i][1] >= SIZE) {
-		//     velocities[i][1] *= -1.0;
-		// }
+		// we now add the average from xsph to this
+	        Set<Integer>[] cs = findChunks(positions[i]);
+		for (Set<Integer> chunk: cs) {
+		    if (chunk != null) {
+			for (Integer j: chunk) {
+			    if (i != j) {
+				double[] r = subtract(positions[j], positions[i]);
+				velocities[i] = add(velocities[i],
+						    scalar_multiple(XSPH_CONSTANT *
+								    kernel_values[i][j] /
+								    densities[j],
+								    r));
+			    }
+			}
+		    }
+		}
 	    });
 	accelerations = new_accelerations;
 	time += timeStep;
