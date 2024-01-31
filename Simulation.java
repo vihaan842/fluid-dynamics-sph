@@ -23,15 +23,15 @@ public class Simulation {
     public double[] densities;
     public final double chunkSize = diameter / 2;
     private Set<Integer>[][] chunks;
-    private int chunk_size;
+    private int numChunks;
     public double timeStep;// seconds
     public double time;
     private double mvct = 0.0;
     public Simulation(double step) {
-	chunk_size = (int)Math.ceil(SIZE/chunkSize);
-	chunks = new Set[chunk_size][chunk_size];
-	for (int i = 0; i < chunk_size; i++) {
-	    for (int j = 0; j < chunk_size; j++) {
+	numChunks = (int)Math.ceil(SIZE/chunkSize);
+	chunks = new Set[numChunks][numChunks];
+	for (int i = 0; i < numChunks; i++) {
+	    for (int j = 0; j < numChunks; j++) {
 		chunks[i][j] = new CopyOnWriteArraySet();
 	    }
 	}
@@ -125,23 +125,23 @@ public class Simulation {
 		cs[1] = chunks[chunkX-1][chunkY-1];
 	    }
 	    cs[2] = chunks[chunkX-1][chunkY];
-	    if (chunkY < chunk_size-1) {
+	    if (chunkY < numChunks-1) {
 		cs[3] = chunks[chunkX-1][chunkY+1];
 	    }
 	}
-	if (chunkX < (chunk_size - 1)) {
+	if (chunkX < (numChunks - 1)) {
 	    if (chunkY > 0) {
 		cs[4] = chunks[chunkX+1][chunkY-1];
 	    }
 	    cs[5] = chunks[chunkX+1][chunkY];
-	    if (chunkY < chunk_size-1) {
+	    if (chunkY < numChunks-1) {
 		cs[6] = chunks[chunkX+1][chunkY+1];
 	    }
 	}
 	if (chunkY > 0) {
 	    cs[7] = chunks[chunkX][chunkY-1];
 	}
-	if (chunkY < (chunk_size - 1)) {
+	if (chunkY < (numChunks - 1)) {
 	    cs[8] = chunks[chunkX][chunkY+1];
 	}
 	return cs;
