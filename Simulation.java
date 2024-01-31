@@ -120,10 +120,8 @@ public class Simulation {
 	int chunkX = (int)(r[0] / chunkSize);
 	int chunkY = (int)(r[1] / chunkSize);
 	Set<Integer>[] cs = new Set[(2*chunkScale+1)*(2*chunkScale+1)];
-        // IntStream.range(-chunkScale, chunkScale+1).parallel().forEach(i -> {
 	for (int i = -chunkScale; i < chunkScale+1; i++) {
 	    if (chunkX + i >= 0 && chunkX + i < numChunks) {
-		// IntStream.range(-chunkScale, chunkScale+1).parallel().forEach(j -> {
 		for (int j = -chunkScale; j < chunkScale+1; j++) {
 		    if (chunkY + j >= 0 && chunkY + j < numChunks) {
 			cs[i+chunkScale+(j+chunkScale)*(2*chunkScale+1)] =
@@ -183,23 +181,16 @@ public class Simulation {
 			positions[i][1] -= DAMPING_FACTOR * 1.5 * velocities[i][1] * timeStep;
 			velocities[i][1] *= DAMPING_FACTOR - 1.0;
 		}
-		if (positions[i][0] < 0) {
-			positions[i][0] = 0;
-		}
-		else if (positions[i][0] >= SIZE) {
-			positions[i][0] = SIZE - 0.001;
-		}
-		if (positions[i][1] < 0) {
-			positions[i][1] = 0;
-		}
-		else if (positions[i][1] >= SIZE) {
-			positions[i][1] = SIZE - 0.001;
-		}
-		if ((int)(positions[i][0] / chunkSize) != oldChunkX ||
-		    (int)(positions[i][1] / chunkSize) != oldChunkY) {
+		int newChunkX = (int)(positions[i][0] / chunkSize);
+		int newChunkY = (int)(positions[i][1] / chunkSize);
+		if ((newChunkX != oldChunkX ||
+		     newChunkY != oldChunkY) &&
+		    newChunkX >= 0 && newChunkX < numChunks &&
+		    newChunkY >= 0 && newChunkY < numChunks &&
+		    oldChunkX >= 0 && oldChunkX < numChunks &&
+		    oldChunkY >= 0 && oldChunkY < numChunks) {
 		    chunks[oldChunkX][oldChunkY].remove(i);
-		    chunks[(int)(positions[i][0] / chunkSize)][(int)(positions[i][1] / chunkSize)]
-			.add(i);
+		    chunks[newChunkX][newChunkY].add(i);
 		}
 	    });
 	// we then calculate the densities around each particle
@@ -210,7 +201,7 @@ public class Simulation {
 	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
 		Set<Integer>[] cs = findChunks(positions[i]);
 		new_accelerations[i][0] = 0.0;
-		new_accelerations[i][1] = G;
+		new_accelerations[i][1] = 0.0;
 		// <Insert explanation of derivation>
 		double s = 0.0;
 
