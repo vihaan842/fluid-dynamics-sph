@@ -8,7 +8,7 @@ public class Simulation {
     public static final double PARTICLE_RADIUS = 6.0;// meter
     public static final double diameter = PARTICLE_RADIUS * 2;// meter
     private static final double SMOOTHING_LENGTH_SCALE = PARTICLE_RADIUS / 2.0;
-    public static final int PARTICLES = 1500;
+    public static final int PARTICLES = 3000;
     public static final double PRESSURE_POWER = 1.0 + (1.0 / 2.0);
     public static final double DENSITY_POWER = PRESSURE_POWER - 1;
     public static final double PRESSURE_CONSTANT = 10.0;
@@ -21,7 +21,8 @@ public class Simulation {
     public double[][] accelerations;// meter/(second*second)
     public double[][] new_accelerations;// meter/(second*second)
     public double[] densities;
-    public final double chunkSize = diameter / 2;
+    public final int chunkScale = 2;
+    public final double chunkSize = diameter / (double)chunkScale;
     private Set<Integer>[][] chunks;
     private int numChunks;
     public double timeStep;// seconds
@@ -118,32 +119,19 @@ public class Simulation {
     public Set<Integer>[] findChunks(double[] r) {
 	int chunkX = (int)(r[0] / chunkSize);
 	int chunkY = (int)(r[1] / chunkSize);
-	Set<Integer>[] cs = new Set[9];
-	cs[0] = chunks[chunkX][chunkY];
-	if (chunkX > 0) {
-	    if (chunkY > 0) {
-		cs[1] = chunks[chunkX-1][chunkY-1];
+	Set<Integer>[] cs = new Set[(2*chunkScale+1)*(2*chunkScale+1)];
+        // IntStream.range(-chunkScale, chunkScale+1).parallel().forEach(i -> {
+	for (int i = -chunkScale; i < chunkScale+1; i++) {
+	    if (chunkX + i >= 0 && chunkX + i < numChunks) {
+		// IntStream.range(-chunkScale, chunkScale+1).parallel().forEach(j -> {
+		for (int j = -chunkScale; j < chunkScale+1; j++) {
+		    if (chunkY + j >= 0 && chunkY + j < numChunks) {
+			cs[i+chunkScale+(j+chunkScale)*(2*chunkScale+1)] =
+			    chunks[chunkX + i][chunkY + j];
+		    }
+		};
 	    }
-	    cs[2] = chunks[chunkX-1][chunkY];
-	    if (chunkY < numChunks-1) {
-		cs[3] = chunks[chunkX-1][chunkY+1];
-	    }
-	}
-	if (chunkX < (numChunks - 1)) {
-	    if (chunkY > 0) {
-		cs[4] = chunks[chunkX+1][chunkY-1];
-	    }
-	    cs[5] = chunks[chunkX+1][chunkY];
-	    if (chunkY < numChunks-1) {
-		cs[6] = chunks[chunkX+1][chunkY+1];
-	    }
-	}
-	if (chunkY > 0) {
-	    cs[7] = chunks[chunkX][chunkY-1];
-	}
-	if (chunkY < (numChunks - 1)) {
-	    cs[8] = chunks[chunkX][chunkY+1];
-	}
+	};
 	return cs;
     }
     
