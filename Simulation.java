@@ -1,7 +1,9 @@
+/*
+ * Simulation.java
+ */
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.stream.IntStream;
-
 public class Simulation {
     private static final int DIMENSIONS = 2;
     public static final double SIZE = 150.0;// meter
@@ -31,7 +33,7 @@ public class Simulation {
     private double timeStep;// seconds
     public double time;
     private double mvct = 0.0;
-    public Simulation(double step) {
+    public Simulation(double step) {// This simply sets up the simulation
 	numChunks = (int)Math.ceil(SIZE/chunkSize);
 	chunks = new Set[numChunks][numChunks];
 	for (int i = 0; i < numChunks; i++) {
@@ -40,7 +42,7 @@ public class Simulation {
 	    }
 	}
 	positions = new double[particles][DIMENSIONS];
-	for (int i = 0; i < particles; i++) {
+	for (int i = 0; i < particles; i++) {// Distribute the particles
 	    for (int j = 0; j < DIMENSIONS; j++) {
 		positions[i][j] = (Math.random() * SIZE * 0.5 + 30.0) / ((double) (2 - j));
 	    }
@@ -53,7 +55,7 @@ public class Simulation {
 	new_accelerations = new double[particles][DIMENSIONS];
 	densities = new double[particles];
 	timeStep = step;
-	time = 0;
+	time = 0;// Set the elapsed time to 0 seconds
     }
     
     // find the magnitude of a vector with 2 elements
@@ -76,7 +78,9 @@ public class Simulation {
 	return new double[] {k * vec[0], k * vec[1]};
     }
     
-    public double kernel(double[] position) {
+    public double kernel(double[] position) {// Calculate the kernel at a point, considering the
+	// particle as being at the origin
+	
 	// We will use the cubic spline smoothing kernel
 	// We first calculate q = ||r||/h
 	double q = magnitude(position) / SMOOTHING_LENGTH_SCALE;
@@ -97,7 +101,9 @@ public class Simulation {
 	}
     }
 
-    public double[] kernel_gradient(double[] position) {
+    public double[] kernel_gradient(double[] position) {// Find the gradient of the kernel at a point, considering
+	//the particle as being at the origin
+	
 	// To find this gradient, we note that q = sqrt(x^2+y^2+...)
 	// We let W = value of the kernel
 	// dW/dx = dW/dq * dq/dx
@@ -120,7 +126,9 @@ public class Simulation {
 	}
     }
 
-    public Set<Integer>[] findChunks(double[] r) {
+    public Set<Integer>[] findChunks(double[] r) {// Finding the chunks that may effect a particle,
+	// we find a square of chunks that is the appropriate size and is centered on the chunk that
+	// the particle is in
 	int chunkX = (int)(r[0] / chunkSize);
 	int chunkY = (int)(r[1] / chunkSize);
 	Set<Integer>[] cs = new Set[(2*chunkScale+1)*(2*chunkScale+1)];
@@ -157,17 +165,6 @@ public class Simulation {
     }
 
     public synchronized void step() {// This procedure performs simulation for 1 step of time
-	/*
-	mvct += 1.0 / (Math.random() * 10.0 * timeStep);
-	while (mvct >= 1.0) {
-		mvct--;
-		int i = (int) (Math.random() * particles);
-		positions[i][0] = 20.0 + (Math.random() * 10.0);
-		positions[i][1] = SIZE - 40 - (Math.random() * 100.0);
-		velocities[i][0] = Math.random();
-		velocities[i][1] = Math.random();
-	}
-	*/
 	// we first update the positions using the old velocity and acceleration values,
 	// making sure to update the chunk values if necessary
 	IntStream.range(0, particles).parallel().forEach((i) -> {
@@ -203,26 +200,26 @@ public class Simulation {
 	    });
 	// we then use this to determine the new accelerations for all the particles
 	IntStream.range(0, particles).parallel().forEach((i) -> {// For each particle,
-		Set<Integer>[] cs = findChunks(positions[i]);// We find the chunks of space that may contain other particles that may
-		// be effected by the particle throught repulsive forces
+
 		new_accelerations[i][0] = 0.0;// We keep a running sum of accelerations / forces
-		new_accelerations[i][1] = G;
+		new_accelerations[i][1] = G;// Add the gravitational force to the acceleration forces
 		// <Insert explanation of derivation>
 		double s = 0.0;
-
-		for (Set<Integer> chunk: cs) {// For each chunk that 
+		Set<Integer>[] cs = findChunks(positions[i]);// We find the chunks of space that may contain other particles that may
+		// be effected by the particle throught repulsive forces
+		for (Set<Integer> chunk: cs) {// For each of those chunks, 
 		    if (chunk != null) {
-			for (Integer j: chunk) {
-			    if (i != j) {
+			for (Integer j: chunk) {// For each particle j within the chunk,
+			    if (i != j) {// except for particle i,
 				new_accelerations[i] =
-				    add(new_accelerations[i],
-					scalar_multiple(-PRESSURE_CONSTANT *
+				    add(new_accelerations[i],// We add to the running acceleration sum
+					scalar_multiple(-PRESSURE_CONSTANT *// The product of
 							(
 							 densities[i] + 
 							 densities[j]
-							 ),
+							 ),// the calculated pressure
 							kernel_gradient(subtract(positions[i],
-										 positions[j]))));
+										 positions[j]))));// and the gradient of the kernel function of particle j at particle i's position
 			    }
 			}
 		    }
@@ -231,14 +228,14 @@ public class Simulation {
 		    // add(new_accelerations[i],
 			// scalar_multiple(DAMPING_FACTOR-1.0, velocities[i]));
 	    });
-	// now, we have to update the velocities
-	IntStream.range(0, particles).parallel().forEach(i -> {
-		velocities[i] = add(velocities[i],
+	// Now, we have to update the velocities
+	IntStream.range(0, particles).parallel().forEach(i -> {// For each particle
+		velocities[i] = add(velocities[i],// v + (timeStep / 2) * (a + a_new) -> v
 				    scalar_multiple(timeStep/2,
 						    add(accelerations[i],
 							new_accelerations[i])));
 	    });
-	// we now calculate the viscosities
+	// We now calculate the viscosities
 	IntStream.range(0, particles).parallel().forEach(i -> {
 	        Set<Integer>[] cs = findChunks(positions[i]);
 		viscosities[i] = ZERO_VECTOR;
@@ -264,7 +261,8 @@ public class Simulation {
 	accelerations = new_accelerations;
 	time += timeStep;
     }
-    public void addParticles(int n, double x, double y, double radius) {
+    public void addParticles(int n, double x, double y, double radius) {// This function simply adds a specified amount of 
+	//particles within a specified radius of a specified point
 	if (particles + n > capacity) {
 	    System.out.println("Increasing capacity");
 	    double[][] old_positions = positions;
@@ -297,7 +295,7 @@ public class Simulation {
 	
 	particles += n;
     }
-    public synchronized double getProperty(int i) throws Exception {
+    public synchronized double getProperty(int i) throws Exception {// For fetching simulation properties
 	switch (i) {
 	case (0):
 	    return G;
@@ -308,7 +306,7 @@ public class Simulation {
 	}
 	throw new Exception();
     }
-    public synchronized void setProperty(int i, double d) throws Exception {
+    public synchronized void setProperty(int i, double d) throws Exception {// For changing simulation properties
 	switch (i) {
 	case (0):
 	    G = d;
@@ -316,7 +314,7 @@ public class Simulation {
 	case (1):
 	    timeStep = d / 1000.0;
 	    return;
-	case(2):
+	case (2):
 	    VISCOSITY = d / 1000.0;
 	    return;
 	}

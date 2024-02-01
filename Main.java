@@ -1,3 +1,6 @@
+/*
+ * Main.java
+ */
 import java.awt.*;
 import java.awt.event.*;
 import java.io.EOFException;
@@ -11,6 +14,9 @@ import javax.swing.event.ChangeEvent;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Set;
+// The functionality in this file establishes the user interface, sets up the simulation, calls a
+// function that steps the simulation through time, and displays the state
+// of the simulation. The code that computes the simulation is in the file `Simulation.java'
 public class Main {
 	static int width = 600;
 	static JButton[] buttons;
@@ -26,8 +32,8 @@ public class Main {
 				return -12;
 			case (1):
 				return 5;
-		case (2):
-		    return 0;
+			case (2):
+				return 0;
 		}
 		throw new Exception();
 	}
@@ -37,8 +43,8 @@ public class Main {
 				return 12;
 			case (1):
 				return 100;
-		case (2):
-		    return 1000;
+			case (2):
+				return 1000;
 		}
 		throw new Exception();
 	}
@@ -55,8 +61,8 @@ public class Main {
 				return "G (m/s)";
 			case (1):
 				return "Time step (ms)";
-		case (2):
-		    return "Viscosity (mass/m*1000s)";
+			case (2):
+				return "Viscosity (1000 * mass / (m * s))";
 		}
 		throw new Exception();
 	}
