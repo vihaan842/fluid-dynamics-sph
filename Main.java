@@ -15,7 +15,7 @@ public class Main {
 	static int width = 600;
 	static JButton[] buttons;
 	static ButtonHandler[] handlers;
-	static final int BUTTON_COUNT = 2;
+	static final int BUTTON_COUNT = 0;
 	static final int SLIDER_COUNT = 2;
 	static JSlider[] sliders;
 	static SliderHandler[] shandelers;
@@ -69,9 +69,9 @@ public class Main {
 			jp.add(buttons[i]);
 			jp.add(new JLabel("Button " + i));
 		}
-		sliders = new JSlider[BUTTON_COUNT];
-		shandelers = new SliderHandler[BUTTON_COUNT];
-		for (int i = 0; i < buttons.length; i++) {
+		sliders = new JSlider[SLIDER_COUNT];
+		shandelers = new SliderHandler[SLIDER_COUNT];
+		for (int i = 0; i < sliders.length; i++) {
 			sliders[i] = new JSlider((int) getMin(i), (int) getMax(i), (int) getVal(i));
 			sliders[i].setMajorTickSpacing((((int) getMax(i)) - ((int) getMin(i))) / 4);
 			//sliders[i].setMinorTickSpacing(1);
