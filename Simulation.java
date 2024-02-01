@@ -13,7 +13,7 @@ public class Simulation {
     public static final double PRESSURE_CONSTANT = 10.0;
     private static final double DAMPING_FACTOR = 0.9;
     private static final double NORMALIZATION_CONSTANT = 5.0 / (14.0 * Math.PI * SMOOTHING_LENGTH_SCALE * SMOOTHING_LENGTH_SCALE);// Assuming 2 dimensions
-    private static final double VISCOSITY = 0.125; // note: this has no real world analog; this is just for simulation purposes
+    private static double VISCOSITY = 0.125; // note: this has no real world analog; this is just for simulation purposes
     private static double G = 9.81;// meter/(second*second)
     private static final double[] ZERO_VECTOR = {0.0, 0.0};
     public int particles = 3000;
@@ -117,24 +117,6 @@ public class Simulation {
 	}
 	else {
 	    return scalar_multiple((-16/q+28-15*q) * NORMALIZATION_CONSTANT, position);
-	}
-    }
-
-    public double kernel_lagrangian(double[] position) {
-	// We just take the gradient and take the partials again.
-	// Since we had x * scalar + y * scalar + ..., we just end
-	// up with all components being the scalar
-	// this just ends up being DIMENSION * the scalar
-	double q = magnitude(position) / SMOOTHING_LENGTH_SCALE;
-	if (q >= 2) {
-	    return 0.0;
-	}
-	else if (q >= 1) {
-	    // only for two dimensions
-	    return DIMENSIONS * (-4/q+6-3*q) * NORMALIZATION_CONSTANT;
-	}
-	else {
-	    return DIMENSIONS * (-16/q+28-15*q) * NORMALIZATION_CONSTANT;
 	}
     }
 
@@ -321,6 +303,8 @@ public class Simulation {
 	    return G;
 	case (1):
 	    return timeStep * 1000;
+	case (2):
+	    return VISCOSITY * 1000;
 	}
 	throw new Exception();
     }
@@ -331,6 +315,9 @@ public class Simulation {
 	    return;
 	case (1):
 	    timeStep = d / 1000.0;
+	    return;
+	case(2):
+	    VISCOSITY = d / 1000.0;
 	    return;
 	}
 	throw new Exception();

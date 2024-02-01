@@ -16,7 +16,7 @@ public class Main {
 	static JButton[] buttons;
 	static ButtonHandler[] handlers;
 	static final int BUTTON_COUNT = 0;
-	static final int SLIDER_COUNT = 2;
+	static final int SLIDER_COUNT = 3;
 	static JSlider[] sliders;
 	static SliderHandler[] shandelers;
 	static Simulation simulation;
@@ -26,6 +26,8 @@ public class Main {
 				return -12;
 			case (1):
 				return 5;
+		case (2):
+		    return 0;
 		}
 		throw new Exception();
 	}
@@ -35,6 +37,8 @@ public class Main {
 				return 12;
 			case (1):
 				return 100;
+		case (2):
+		    return 1000;
 		}
 		throw new Exception();
 	}
@@ -51,6 +55,8 @@ public class Main {
 				return "G (m/s)";
 			case (1):
 				return "Time step (ms)";
+		case (2):
+		    return "Viscosity (mass/m*1000s)";
 		}
 		throw new Exception();
 	}
