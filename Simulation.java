@@ -77,9 +77,13 @@ public class Simulation {
     public static double[] scalar_multiple(double k, double[] vec) {
 	return new double[] {k * vec[0], k * vec[1]};
     }
-    
-    public double kernel(double[] position) {// Calculate the kernel at a point, considering the
+
+    public double kernel(double[] position) {
+	// Calculate the kernel at a point, considering the
 	// particle as being at the origin
+	// The kernel is used to model interactions between particles,
+	// with particles that are closer getting more influence
+	// We ignore particles that are outside of the radius
 	
 	// We will use the cubic spline smoothing kernel
 	// We first calculate q = ||r||/h
@@ -101,7 +105,8 @@ public class Simulation {
 	}
     }
 
-    public double[] kernel_gradient(double[] position) {// Find the gradient of the kernel at a point, considering
+    public double[] kernel_gradient(double[] position) {
+	// Find the gradient of the kernel at a point, considering
 	//the particle as being at the origin
 	
 	// To find this gradient, we note that q = sqrt(x^2+y^2+...)
@@ -126,7 +131,10 @@ public class Simulation {
 	}
     }
 
-    public Set<Integer>[] findChunks(double[] r) {// Finding the chunks that may effect a particle,
+    public Set<Integer>[] findChunks(double[] r) {
+	// Finding the chunks that may effect a particle, i.e. the chunks that are actually in the
+	// radius of the kernel
+	// This allows us to skip a bunch of particles and greatly speeds up the simulation
 	// we find a square of chunks that is the appropriate size and is centered on the chunk that
 	// the particle is in
 	int chunkX = (int)(r[0] / chunkSize);
@@ -164,7 +172,19 @@ public class Simulation {
 	return s;
     }
 
-    public synchronized void step() {// This procedure performs simulation for 1 step of time
+    public synchronized void step() {
+	// This procedure performs simulation for 1 step of time
+	// This uses "leap frog" integration, which is second order instead of first
+	// order like Euler's method, which is good because our equation is for acceleration.
+	// Usually, leap frog looks like:
+	//  a(i) = A(x(i))
+	//  v(i+1/2) = v(i-1/2) + a(i)delta(t)
+	//  x(i+1) = x(i) + v(i+1/2)delta(t)
+	// However, this is not very useful because it requires us to calculate half steps
+	// Instead, we turn it into a form that uses full steps:
+	//  x(i+1) = x(i) + v(i)delta(t) + a(t)/2*delta(t)^2
+	//  v(i+1) = v(i) + 1/2(a(i) + a(i+1))delta(t)
+	
 	// we first update the positions using the old velocity and acceleration values,
 	// making sure to update the chunk values if necessary
 	IntStream.range(0, particles).parallel().forEach((i) -> {
@@ -199,11 +219,25 @@ public class Simulation {
 		densities[i] = Math.max(0.001, Math.pow(density(i), DENSITY_POWER));
 	    });
 	// we then use this to determine the new accelerations for all the particles
-	IntStream.range(0, particles).parallel().forEach((i) -> {// For each particle,
-
+	IntStream.range(0, particles).parallel().forEach((i) -> {// For each particle
+		// Please refer to https://pmocz.github.io/manuscripts/pmocz_sph.pdf for a full explanation
+		// The following is a fast summary:
+		// Remember, a(i) = A(x(i))
+		// We know that A(r) = int(A(r')d(r-r')dr'), where d is the Dirac delta function
+		// We then approximate d as the smoothing kernel, and we get
+		//  A(r) = int(A(r')W(r-r')dr'), where W is the smoothing kernel
+		// We then turn this into a discrete sum
+		//  A(r) = sum(A(x(j))W(r-r(j))delta(V(j)))
+		// We can now find the gradient and lapacian quite easily
+		// We then consider Euler's equation:
+		//  ro*dv/dt = -gradient(P) + f
+		// We can rewrite this as:
+		//  gradient(P)/ro = gradient(P/ro) + P/ro^2 * gradient(ro)
+		// Then, we can use this to write:
+		//  dv(i)/dt = -sum((P(i)/ro(i)^2 + P(j)/ro(j)^2)gradient(W(r - r(j)))) + b(i)
+		
 		new_accelerations[i][0] = 0.0;// We keep a running sum of accelerations / forces
 		new_accelerations[i][1] = G;// Add the gravitational force to the acceleration forces
-		// <Insert explanation of derivation>
 		double s = 0.0;
 		Set<Integer>[] cs = findChunks(positions[i]);// We find the chunks of space that may contain other particles that may
 		// be effected by the particle throught repulsive forces
@@ -224,18 +258,18 @@ public class Simulation {
 			}
 		    }
 		}
-		// new_accelerations[i] =
-		    // add(new_accelerations[i],
-			// scalar_multiple(DAMPING_FACTOR-1.0, velocities[i]));
 	    });
 	// Now, we have to update the velocities
+	// This is again according to the leap frog technique
 	IntStream.range(0, particles).parallel().forEach(i -> {// For each particle
 		velocities[i] = add(velocities[i],// v + (timeStep / 2) * (a + a_new) -> v
 				    scalar_multiple(timeStep/2,
 						    add(accelerations[i],
 							new_accelerations[i])));
 	    });
-	// We now calculate the viscosities
+	// We now calculate the viscosities, which ensure that our particles behave
+	// more like a fluid rather than a bunch of particles
+	// We simply add this onto the velocities afterwards
 	IntStream.range(0, particles).parallel().forEach(i -> {
 	        Set<Integer>[] cs = findChunks(positions[i]);
 		viscosities[i] = ZERO_VECTOR;
@@ -258,11 +292,15 @@ public class Simulation {
 	IntStream.range(0, particles).parallel().forEach(i -> {
 		velocities[i] = add(velocities[i], viscosities[i]);
 	    });
+	// We update the accelerations
 	accelerations = new_accelerations;
 	time += timeStep;
     }
-    public void addParticles(int n, double x, double y, double radius) {// This function simply adds a specified amount of 
-	//particles within a specified radius of a specified point
+    public void addParticles(int n, double x, double y, double radius) {
+	// This function simply adds a specified amount of 
+	// particles within a specified radius of a specified point
+	// This has various problems right now and we recommend that you
+	// not use it.
 	if (particles + n > capacity) {
 	    System.out.println("Increasing capacity");
 	    double[][] old_positions = positions;
@@ -295,7 +333,8 @@ public class Simulation {
 	
 	particles += n;
     }
-    public synchronized double getProperty(int i) throws Exception {// For fetching simulation properties
+    public synchronized double getProperty(int i) throws Exception {
+	// For fetching simulation properties to show in the UI
 	switch (i) {
 	case (0):
 	    return G;
@@ -306,7 +345,8 @@ public class Simulation {
 	}
 	throw new Exception();
     }
-    public synchronized void setProperty(int i, double d) throws Exception {// For changing simulation properties
+    public synchronized void setProperty(int i, double d) throws Exception {
+	// For changing simulation properties from the UI
 	switch (i) {
 	case (0):
 	    G = d;
