@@ -13,17 +13,17 @@ public class Simulation {
     public static final double PRESSURE_CONSTANT = 10.0;
     private static final double DAMPING_FACTOR = 0.9;
     private static final double NORMALIZATION_CONSTANT = 5.0 / (14.0 * Math.PI * SMOOTHING_LENGTH_SCALE * SMOOTHING_LENGTH_SCALE);// Assuming 2 dimensions
-    private static final double XSPH_CONSTANT = 2.0; // note: this has no real world analog; this is just for simulation purposes
+    private static final double VISCOSITY = 0.125; // note: this has no real world analog; this is just for simulation purposes
     private static final double G = 9.81;// meter/(second*second)
     private static final double[] ZERO_VECTOR = {0.0, 0.0};
     public int particles = 3000;
     public int capacity = particles;
     public double[][] positions;// meter
     public double[][] velocities;// meter/second
+    public double[][] viscosities;// meter/second
     public double[][] accelerations;// meter/(second*second)
     public double[][] new_accelerations;// meter/(second*second)
     public double[] densities;
-    private double[][] kernel_values;
     public final int chunkScale = 2;
     public final double chunkSize = diameter / (double)chunkScale;
     private Set<Integer>[][] chunks;
@@ -48,10 +48,10 @@ public class Simulation {
 		.add(i);
 	}
 	velocities = new double[particles][DIMENSIONS];
+	viscosities = new double[particles][DIMENSIONS];
 	accelerations = new double[particles][DIMENSIONS];
 	new_accelerations = new double[particles][DIMENSIONS];
 	densities = new double[particles];
-	kernel_values = new double[particles][particles];
 	timeStep = step;
 	time = 0;
     }
@@ -120,6 +120,24 @@ public class Simulation {
 	}
     }
 
+    public double kernel_lagrangian(double[] position) {
+	// We just take the gradient and take the partials again.
+	// Since we had x * scalar + y * scalar + ..., we just end
+	// up with all components being the scalar
+	// this just ends up being DIMENSION * the scalar
+	double q = magnitude(position) / SMOOTHING_LENGTH_SCALE;
+	if (q >= 2) {
+	    return 0.0;
+	}
+	else if (q >= 1) {
+	    // only for two dimensions
+	    return DIMENSIONS * (-4/q+6-3*q) * NORMALIZATION_CONSTANT;
+	}
+	else {
+	    return DIMENSIONS * (-16/q+28-15*q) * NORMALIZATION_CONSTANT;
+	}
+    }
+
     public Set<Integer>[] findChunks(double[] r) {
 	int chunkX = (int)(r[0] / chunkSize);
 	int chunkY = (int)(r[1] / chunkSize);
@@ -149,9 +167,7 @@ public class Simulation {
 	for (Set<Integer> chunk: cs) {
 	    if (chunk != null) {
 		for (Integer particle: chunk) {
-		    kernel_values[index][particle] = kernel(subtract(r, positions[particle]));
-		    s += kernel_values[index][particle];
-		    // s += kernel(subtract(r, positions[particle]));
+		    s += kernel(subtract(r, positions[particle]));
 		}
 	    }
 	}
@@ -233,27 +249,34 @@ public class Simulation {
 			// scalar_multiple(DAMPING_FACTOR-1.0, velocities[i]));
 	    });
 	// now, we have to update the velocities
-	IntStream.range(0, particles).parallel().forEach((i) -> {
+	IntStream.range(0, particles).parallel().forEach(i -> {
 		velocities[i] = add(velocities[i],
 				    scalar_multiple(timeStep/2,
 						    add(accelerations[i],
 							new_accelerations[i])));
-		// we now add the average from xsph to this
+	    });
+	// we now calculate the viscosities
+	IntStream.range(0, particles).parallel().forEach(i -> {
 	        Set<Integer>[] cs = findChunks(positions[i]);
+		viscosities[i] = ZERO_VECTOR;
 		for (Set<Integer> chunk: cs) {
 		    if (chunk != null) {
 			for (Integer j: chunk) {
 			    if (i != j) {
 				double[] r = subtract(positions[j], positions[i]);
-				velocities[i] = add(velocities[i],
-						    scalar_multiple(XSPH_CONSTANT *
-								    kernel_values[i][j] /
-								    densities[j],
-								    r));
+				viscosities[i] = add(viscosities[i],
+						     scalar_multiple(VISCOSITY *
+								     kernel(r) /
+								     densities[j],
+								     subtract(velocities[j], velocities[i])));
 			    }
 			}
 		    }
 		}
+	    });
+	// we add the viscosities to the velocities
+	IntStream.range(0, particles).parallel().forEach(i -> {
+		velocities[i] = add(velocities[i], viscosities[i]);
 	    });
 	accelerations = new_accelerations;
 	time += timeStep;
@@ -269,10 +292,10 @@ public class Simulation {
 	    capacity *= 2;
 	    positions = new double[capacity][DIMENSIONS];
 	    velocities = new double[capacity][DIMENSIONS];
+	    viscosities = new double[capacity][DIMENSIONS];
 	    accelerations = new double[capacity][DIMENSIONS];
 	    new_accelerations = new double[capacity][DIMENSIONS];
 	    densities = new double[capacity];
-	    kernel_values = new double[capacity][capacity];
 	    IntStream.range(0, particles).parallel().forEach(i -> {
 		    positions[i] = old_positions[i];
 		    velocities[i] = old_velocities[i];
