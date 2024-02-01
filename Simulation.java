@@ -26,6 +26,9 @@ public class Simulation {
     public double[][] accelerations;// meter/(second*second)
     public double[][] new_accelerations;// meter/(second*second)
     public double[] densities;
+    // We split the space into "chunks", and we store which particles are in which chunk here
+    // This allows us to skip checking particles that are far away because we know roughly how
+    // far away they are
     public final int chunkScale = 2;
     public final double chunkSize = diameter / (double)chunkScale;
     private Set<Integer>[][] chunks;
@@ -185,15 +188,18 @@ public class Simulation {
 	//  x(i+1) = x(i) + v(i)delta(t) + a(t)/2*delta(t)^2
 	//  v(i+1) = v(i) + 1/2(a(i) + a(i+1))delta(t)
 	
-	// we first update the positions using the old velocity and acceleration values,
+	// We first update the positions using the old velocity and acceleration values,
 	// making sure to update the chunk values if necessary
 	IntStream.range(0, particles).parallel().forEach((i) -> {
+		// Store the previous chunk that the particle is in for use later on
 		int oldChunkX = (int)(positions[i][0] / chunkSize);
 		int oldChunkY = (int)(positions[i][1] / chunkSize);
 		positions[i] = add(positions[i],
 				   add(scalar_multiple(timeStep, velocities[i]),
 				       scalar_multiple(timeStep*timeStep/2.0,
 						       accelerations[i])));
+		// This will "bounce" the particles if the hit a wall
+		// Note that there is no good way to represent boundaries in SPH
 		if (positions[i][0] < 0.0 || positions[i][0] >= SIZE) {// TODO Prevent particles from becoming stuck in walls when `timeStep' is small (less than 0.03) and when the damping factor is very high (greater than 0.95)
 			positions[i][0] -= DAMPING_FACTOR * 1.5 * velocities[i][0] * timeStep;
 			velocities[i][0] *= DAMPING_FACTOR - 1.0;
@@ -202,6 +208,7 @@ public class Simulation {
 			positions[i][1] -= DAMPING_FACTOR * 1.5 * velocities[i][1] * timeStep;
 			velocities[i][1] *= DAMPING_FACTOR - 1.0;
 		}
+		// Update the chunks if applicable
 		int newChunkX = (int)(positions[i][0] / chunkSize);
 		int newChunkY = (int)(positions[i][1] / chunkSize);
 		if ((newChunkX != oldChunkX ||
@@ -214,11 +221,16 @@ public class Simulation {
 		    chunks[newChunkX][newChunkY].add(i);
 		}
 	    });
-	// we then calculate the densities around each particle
+	// We then calculate the densities around each particle
+	// We raise it to the power needed for the density so that we don't have to
+	// do it later
+	// We also set a minimum density because otherwise, during viscosity calculations,
+	// you could end up getting a very large viscosity value, which would cause the
+	// particle to leave bounds
 	IntStream.range(0, particles).parallel().forEach((i) -> {
 		densities[i] = Math.max(0.001, Math.pow(density(i), DENSITY_POWER));
 	    });
-	// we then use this to determine the new accelerations for all the particles
+	// We then use this to determine the new accelerations for all the particles
 	IntStream.range(0, particles).parallel().forEach((i) -> {// For each particle
 		// Please refer to https://pmocz.github.io/manuscripts/pmocz_sph.pdf for a full explanation
 		// The following is a fast summary:
@@ -235,6 +247,8 @@ public class Simulation {
 		//  gradient(P)/ro = gradient(P/ro) + P/ro^2 * gradient(ro)
 		// Then, we can use this to write:
 		//  dv(i)/dt = -sum((P(i)/ro(i)^2 + P(j)/ro(j)^2)gradient(W(r - r(j)))) + b(i)
+		// Since P = k*ro^(1+1/polytropic index), when we divide by ro^2, we end up with
+		// k*ro^(-1+1/polytropic index)
 		
 		new_accelerations[i][0] = 0.0;// We keep a running sum of accelerations / forces
 		new_accelerations[i][1] = G;// Add the gravitational force to the acceleration forces
@@ -288,7 +302,7 @@ public class Simulation {
 		    }
 		}
 	    });
-	// we add the viscosities to the velocities
+	// We add the viscosities to the velocities
 	IntStream.range(0, particles).parallel().forEach(i -> {
 		velocities[i] = add(velocities[i], viscosities[i]);
 	    });
