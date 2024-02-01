@@ -2,18 +2,88 @@ import java.awt.*;
 import java.io.EOFException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import javax.swing.JFrame;
+import javax.swing.*;
+import java.awt.event.ActionListener;
+import java.awt.event.ActionEvent;
+import javax.swing.event.ChangeListener;
+import javax.swing.event.ChangeEvent;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.Set;
 public class Main {
-	static int width = 800;
+	static int width = 600;
+	static JButton[] buttons;
+	static ButtonHandler[] handlers;
+	static final int BUTTON_COUNT = 2;
+	static final int SLIDER_COUNT = 2;
+	static JSlider[] sliders;
+	static SliderHandler[] shandelers;
+	static Simulation simulation;
+	static double getMin(int i) throws Exception {
+		switch (i) {
+			case (0):
+				return -12;
+			case (1):
+				return 5;
+		}
+		throw new Exception();
+	}
+	static double getMax(int i) throws Exception {
+		switch (i) {
+			case (0):
+				return 12;
+			case (1):
+				return 100;
+		}
+		throw new Exception();
+	}
+	static double getVal(int i) throws Exception {
+		return simulation.getProperty(i);
+	}
+	static void setVal(int i, double d) throws Exception {
+		simulation.setProperty(i, d);
+		return;
+	}
+	static String getName(int i) throws Exception {
+		switch (i) {
+			case (0):
+				return "G (m/s)";
+			case (1):
+				return "Time step (ms)";
+		}
+		throw new Exception();
+	}
 	public static void main(String[] args) throws Exception {
-		Simulation sim = new Simulation(1.0 / 15.0);
+		Simulation sim = simulation = new Simulation(1.0 / 15.0);
 		Display displ = new Display(width, width, sim);
 		JFrame frm = new JFrame();
+		JPanel jp = new JPanel();
+		jp.setLayout(new GridLayout(2, BUTTON_COUNT + SLIDER_COUNT));
+		buttons = new JButton[BUTTON_COUNT];
+		handlers = new ButtonHandler[BUTTON_COUNT];
+		for (int i = 0; i < buttons.length; i++) {
+			buttons[i] = new JButton("Button " + i);
+			handlers[i] = new ButtonHandler(i);
+			buttons[i].addActionListener(handlers[i]);
+			jp.add(buttons[i]);
+			jp.add(new JLabel("Button " + i));
+		}
+		sliders = new JSlider[BUTTON_COUNT];
+		shandelers = new SliderHandler[BUTTON_COUNT];
+		for (int i = 0; i < buttons.length; i++) {
+			sliders[i] = new JSlider((int) getMin(i), (int) getMax(i), (int) getVal(i));
+			sliders[i].setMajorTickSpacing((((int) getMax(i)) - ((int) getMin(i))) / 4);
+			//sliders[i].setMinorTickSpacing(1);
+			sliders[i].setPaintTicks(true);
+			sliders[i].setPaintLabels(true);
+			shandelers[i] = new SliderHandler(i);
+			sliders[i].addChangeListener(shandelers[i]);
+			jp.add(sliders[i]);
+			jp.add(new JLabel(getName(i)));
+		}
 		frm.add(displ);
-		frm.setSize(width + 50, width + 50);
+		frm.add(jp, BorderLayout.NORTH);
+		frm.setSize(width + 50, width + 150);
 		//f.setLayout(null);
 		frm.setVisible(true);
 		Graphics gr = displ.getGraphics();
@@ -23,6 +93,30 @@ public class Main {
 			sim.step();
 		    }
 		    displ.paint(gr);
+		}
+	}
+}
+class ButtonHandler implements ActionListener {
+	int id;
+	JSlider slider;
+	ButtonHandler(int i) {
+		id = i;
+	}
+	public void actionPerformed(ActionEvent event) {
+	}
+}
+class SliderHandler implements ChangeListener {
+	int id;
+	SliderHandler(int i) {
+		id = i;
+	}
+	public void stateChanged(ChangeEvent event) {
+		try {
+			Main.setVal(id, Main.sliders[id].getValue());
+		}
+		catch (Exception e) {
+			System.err.println("Exception in setting value for property " + id + ": " + e);
+			e.printStackTrace();
 		}
 	}
 }
@@ -46,7 +140,7 @@ class Display extends Canvas {
 		//g.clearRect(0, 0, viewWidth, viewHeight);
 		double maxPressure = 0.0;
 		double maxMvmt = 0.0;
-		int pressureSamplingRate = 10;
+		int pressureSamplingRate = 5;
 		
 		for (int j = 0; j < viewHeight; j += pressureSamplingRate) {
 			for (int i = 0; i < viewWidth; i += pressureSamplingRate) {
@@ -90,8 +184,8 @@ class Display extends Canvas {
 		pressureCoeff = 200.0 / maxPressure;
 		mvmtCoeff = 200.0 / maxMvmt;
 		g.setColor(new Color(255, 255, 255));
-		g.drawString("Fluid Simulator", 40, 750);
-		g.drawString("t=" + Double.toString(sim.time) + "s", 40, 770);
+		g.drawString("Fluid Simulator", 40, 550);
+		g.drawString("t=" + Double.toString(sim.time) + "s", 40, 570);
 		
 		/*
 		g.clearRect(0, 0, viewWidth, viewHeight);

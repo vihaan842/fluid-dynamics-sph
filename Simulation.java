@@ -14,7 +14,7 @@ public class Simulation {
     public static final double PRESSURE_CONSTANT = 10.0;
     private static final double DAMPING_FACTOR = 0.9;
     private static final double NORMALIZATION_CONSTANT = 5.0 / (14.0 * Math.PI * SMOOTHING_LENGTH_SCALE * SMOOTHING_LENGTH_SCALE);// Assuming 2 dimensions
-    private static final double G = 9.81;// meter/(second*second)
+    private static double G = 9.81;// meter/(second*second)
     private static final double[] ZERO_VECTOR = {0.0, 0.0};
     public double[][] positions;// meter
     public double[][] velocities;// meter/second
@@ -25,7 +25,7 @@ public class Simulation {
     public final double chunkSize = diameter / (double)chunkScale;
     private Set<Integer>[][] chunks;
     private int numChunks;
-    public double timeStep;// seconds
+    private double timeStep;// seconds
     public double time;
     private double mvct = 0.0;
     public Simulation(double step) {
@@ -154,7 +154,7 @@ public class Simulation {
 	return s;
     }
 
-    public void step() {
+    public synchronized void step() {// This procedure performs simulation for 1 step of time
 	/*
 	mvct += 1.0 / (Math.random() * 10.0 * timeStep);
 	while (mvct >= 1.0) {
@@ -207,14 +207,15 @@ public class Simulation {
 		densities[i] = Math.pow(density(i), DENSITY_POWER);
 	    });
 	// we then use this to determine the new accelerations for all the particles
-	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
-		Set<Integer>[] cs = findChunks(positions[i]);
-		new_accelerations[i][0] = 0.0;
+	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {// For each particle,
+		Set<Integer>[] cs = findChunks(positions[i]);// We find the chunks of space that may contain other particles that may
+		// be effected by the particle throught repulsive forces
+		new_accelerations[i][0] = 0.0;// We keep a running sum of accelerations / forces
 		new_accelerations[i][1] = G;
 		// <Insert explanation of derivation>
 		double s = 0.0;
 
-		for (Set<Integer> chunk: cs) {
+		for (Set<Integer> chunk: cs) {// For each chunk that 
 		    if (chunk != null) {
 			for (Integer j: chunk) {
 			    if (i != j) {
@@ -252,4 +253,24 @@ public class Simulation {
 	accelerations = new_accelerations;
 	time += timeStep;
     }
+	public synchronized double getProperty(int i) throws Exception {
+		switch (i) {
+			case (0):
+				return G;
+			case (1):
+				return timeStep * 1000;
+		}
+		throw new Exception();
+	}
+	public synchronized void setProperty(int i, double d) throws Exception {
+		switch (i) {
+			case (0):
+				G = d;
+				return;
+			case (1):
+				timeStep = d / 1000.0;
+				return;
+		}
+		throw new Exception();
+	}
 }
