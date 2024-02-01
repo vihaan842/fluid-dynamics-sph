@@ -8,15 +8,16 @@ public class Simulation {
     public static final double PARTICLE_RADIUS = 6.0;// meter
     public static final double diameter = PARTICLE_RADIUS * 2;// meter
     private static final double SMOOTHING_LENGTH_SCALE = PARTICLE_RADIUS / 2.0;
-    public static final int PARTICLES = 3000;
     public static final double PRESSURE_POWER = 1.0 + (1.0 / 2.0);
     public static final double DENSITY_POWER = PRESSURE_POWER - 1;
     public static final double PRESSURE_CONSTANT = 10.0;
     private static final double DAMPING_FACTOR = 0.9;
     private static final double NORMALIZATION_CONSTANT = 5.0 / (14.0 * Math.PI * SMOOTHING_LENGTH_SCALE * SMOOTHING_LENGTH_SCALE);// Assuming 2 dimensions
-    private static final double XSPH_CONSTANT = 1.0; // note: this has no real world analog; this is just for simulation purposes
+    private static final double XSPH_CONSTANT = 2.0; // note: this has no real world analog; this is just for simulation purposes
     private static final double G = 9.81;// meter/(second*second)
     private static final double[] ZERO_VECTOR = {0.0, 0.0};
+    public int particles = 3000;
+    public int capacity = particles;
     public double[][] positions;// meter
     public double[][] velocities;// meter/second
     public double[][] accelerations;// meter/(second*second)
@@ -38,19 +39,19 @@ public class Simulation {
 		chunks[i][j] = new CopyOnWriteArraySet();
 	    }
 	}
-	positions = new double[PARTICLES][DIMENSIONS];
-	for (int i = 0; i < PARTICLES; i++) {
+	positions = new double[particles][DIMENSIONS];
+	for (int i = 0; i < particles; i++) {
 	    for (int j = 0; j < DIMENSIONS; j++) {
 		positions[i][j] = (Math.random() * SIZE * 0.5 + 30.0) / ((double) (2 - j));
 	    }
 	    chunks[(int)(positions[i][0]/chunkSize)][(int)(positions[i][1]/chunkSize)]
 		.add(i);
 	}
-	velocities = new double[PARTICLES][DIMENSIONS];
-	accelerations = new double[PARTICLES][DIMENSIONS];
-	new_accelerations = new double[PARTICLES][DIMENSIONS];
-	densities = new double[PARTICLES];
-	kernel_values = new double[PARTICLES][PARTICLES];
+	velocities = new double[particles][DIMENSIONS];
+	accelerations = new double[particles][DIMENSIONS];
+	new_accelerations = new double[particles][DIMENSIONS];
+	densities = new double[particles];
+	kernel_values = new double[particles][particles];
 	timeStep = step;
 	time = 0;
     }
@@ -150,6 +151,7 @@ public class Simulation {
 		for (Integer particle: chunk) {
 		    kernel_values[index][particle] = kernel(subtract(r, positions[particle]));
 		    s += kernel_values[index][particle];
+		    // s += kernel(subtract(r, positions[particle]));
 		}
 	    }
 	}
@@ -161,7 +163,7 @@ public class Simulation {
 	mvct += 1.0 / (Math.random() * 10.0 * timeStep);
 	while (mvct >= 1.0) {
 		mvct--;
-		int i = (int) (Math.random() * PARTICLES);
+		int i = (int) (Math.random() * particles);
 		positions[i][0] = 20.0 + (Math.random() * 10.0);
 		positions[i][1] = SIZE - 40 - (Math.random() * 100.0);
 		velocities[i][0] = Math.random();
@@ -170,7 +172,7 @@ public class Simulation {
 	*/
 	// we first update the positions using the old velocity and acceleration values,
 	// making sure to update the chunk values if necessary
-	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
+	IntStream.range(0, particles).parallel().forEach((i) -> {
 		int oldChunkX = (int)(positions[i][0] / chunkSize);
 		int oldChunkY = (int)(positions[i][1] / chunkSize);
 		positions[i] = add(positions[i],
@@ -198,11 +200,11 @@ public class Simulation {
 		}
 	    });
 	// we then calculate the densities around each particle
-	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
+	IntStream.range(0, particles).parallel().forEach((i) -> {
 		densities[i] = Math.max(0.001, Math.pow(density(i), DENSITY_POWER));
 	    });
 	// we then use this to determine the new accelerations for all the particles
-	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
+	IntStream.range(0, particles).parallel().forEach((i) -> {
 		Set<Integer>[] cs = findChunks(positions[i]);
 		new_accelerations[i][0] = 0.0;
 		new_accelerations[i][1] = G;
@@ -231,7 +233,7 @@ public class Simulation {
 			// scalar_multiple(DAMPING_FACTOR-1.0, velocities[i]));
 	    });
 	// now, we have to update the velocities
-	IntStream.range(0, PARTICLES).parallel().forEach((i) -> {
+	IntStream.range(0, particles).parallel().forEach((i) -> {
 		velocities[i] = add(velocities[i],
 				    scalar_multiple(timeStep/2,
 						    add(accelerations[i],
@@ -255,5 +257,39 @@ public class Simulation {
 	    });
 	accelerations = new_accelerations;
 	time += timeStep;
+    }
+
+    public void addParticles(int n, double x, double y, double radius) {
+	if (particles + n > capacity) {
+	    System.out.println("Increasing capacity");
+	    double[][] old_positions = positions;
+	    double[][] old_velocities = velocities;
+	    double[][] old_accelerations = accelerations;
+	    double[][] old_new_accelerations = new_accelerations;
+	    capacity *= 2;
+	    positions = new double[capacity][DIMENSIONS];
+	    velocities = new double[capacity][DIMENSIONS];
+	    accelerations = new double[capacity][DIMENSIONS];
+	    new_accelerations = new double[capacity][DIMENSIONS];
+	    densities = new double[capacity];
+	    kernel_values = new double[capacity][capacity];
+	    IntStream.range(0, particles).parallel().forEach(i -> {
+		    positions[i] = old_positions[i];
+		    velocities[i] = old_velocities[i];
+		    accelerations[i] = old_accelerations[i];
+		    new_accelerations[i] = old_new_accelerations[i];
+		});
+	}
+
+	IntStream.range(0, n).parallel().forEach(i -> {
+		double r = Math.random() * radius;
+		double a = Math.random() * 2 * 3.14;
+		positions[particles+i][0] = x + r * Math.cos(a);
+		positions[particles+i][1] = y + r * Math.sin(a);
+		chunks[(int)((x + r * Math.cos(a)) / chunkSize)][(int)((y + r * Math.sin(a)) / chunkSize)]
+		    .add(particles+i);
+	    });
+	
+	particles += n;
     }
 }

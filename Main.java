@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.awt.event.*;
 import java.io.EOFException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -17,16 +18,15 @@ public class Main {
 		//f.setLayout(null);
 		frm.setVisible(true);
 		Graphics gr = displ.getGraphics();
+		frm.addMouseListener(displ);
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		while (true) {
-		    for (int i = 0; i < 5; i++) {
-			sim.step();
-		    }
+		    sim.step();
 		    displ.paint(gr);
 		}
 	}
 }
-class Display extends Canvas {
+class Display extends Canvas implements MouseListener {
 	protected int viewWidth;
 	protected int viewHeight;
 	double scaling;
@@ -40,6 +40,7 @@ class Display extends Canvas {
 		scaling = ((double) x) / Simulation.SIZE;
 		sim = s;
 		radius = (int) (Simulation.PARTICLE_RADIUS * scaling);
+		addMouseListener(this);
 	}
 	public void paint(Graphics g) {
 		//TODO freeze display when re-painting
@@ -123,4 +124,20 @@ class Display extends Canvas {
 		}
 		return new double[]{Simulation.PRESSURE_CONSTANT * Math.pow(s, Simulation.PRESSURE_POWER), dx, dy};
 	}
+
+    public void mousePressed(MouseEvent e) {
+	sim.addParticles(100, e.getX()/scaling, e.getY()/scaling, 10.0);
+    }
+
+    public void mouseExited(MouseEvent e) {
+    }
+
+    public void mouseEntered(MouseEvent e) {
+    }
+
+    public void mouseReleased(MouseEvent e) {
+    }
+
+    public void mouseClicked(MouseEvent e) {
+    }
 }
